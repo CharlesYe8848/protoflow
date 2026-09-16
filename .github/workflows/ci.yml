@@ -1,0 +1,49 @@
+name: CI
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        node: ['22.12.0', '24']
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Install Chrome for screenshot tests
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import os from 'node:os';
+          import path from 'node:path';
+          import { install, resolveBuildId, detectBrowserPlatform, Browser } from '@puppeteer/browsers';
+          const buildId = await resolveBuildId(Browser.CHROMEHEADLESSSHELL, detectBrowserPlatform(), 'stable');
+          const browser = await install({ browser: Browser.CHROMEHEADLESSSHELL, buildId, cacheDir: path.join(os.tmpdir(), 'protoflow-chrome') });
+          fs.appendFileSync(process.env.GITHUB_ENV, `PROTOFLOW_CHROME_PATH=${browser.executablePath}\n`);
+          JS
+      - run: npm test
+      - run: npm run selfcheck
+  dependencies:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm audit --omit=dev --audit-level=high

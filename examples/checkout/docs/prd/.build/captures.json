@@ -1,0 +1,16 @@
+{
+  "captures": [
+    {
+      "id": "cart",
+      "artboardId": "ab_1789430400001",
+      "title": "购物车",
+      "actions": []
+    },
+    {
+      "id": "payment",
+      "artboardId": "ab_1789430400003",
+      "title": "支付方式",
+      "actions": []
+    }
+  ]
+}

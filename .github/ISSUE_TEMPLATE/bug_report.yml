@@ -1,0 +1,35 @@
+name: 问题反馈
+description: 报告安装、预览、标注或文档构建问题
+title: '[Bug] '
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ProtoFlow 版本或 commit
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: 操作系统、Node 版本及使用入口
+      placeholder: macOS / Node 22.20.0 / Codex MCP
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 使用虚构数据给出最小复现，不要上传真实业务项目。
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期行为与实际行为
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 错误日志或截图
+      description: 请先移除密钥、私人路径、客户数据等敏感信息。

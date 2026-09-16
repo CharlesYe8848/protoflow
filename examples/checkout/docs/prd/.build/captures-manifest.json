@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "sealedAt": "2026-09-15T00:00:00.005Z",
+  "images": [
+    {
+      "captureId": "cart",
+      "file": "cart.png",
+      "artboardId": "ab_1789430400001",
+      "title": "购物车"
+    },
+    {
+      "captureId": "payment",
+      "file": "payment.png",
+      "artboardId": "ab_1789430400003",
+      "title": "支付方式"
+    }
+  ]
+}

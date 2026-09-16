@@ -1,0 +1,46 @@
+{
+  "name": "protoflow",
+  "version": "0.1.0",
+  "description": "交互原型、元素标注与 PRD 版本管理，支持 MCP 和 CLI",
+  "type": "module",
+  "license": "MIT",
+  "bin": {
+    "protoflow-mcp": "mcp/server.js",
+    "protoflow": "bin/protoflow-cli.js"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "node mcp/server.js",
+    "demo": "node scripts/demo.mjs",
+    "selfcheck": "node mcp/server.js --selfcheck && node bin/protoflow-cli.js --selfcheck"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "dependencies": {
+    "@babel/standalone": "^7.24.7",
+    "@modelcontextprotocol/sdk": "^1.12.0",
+    "@puppeteer/browsers": "^3.2.1",
+    "marked": "^18.0.11",
+    "mermaid": "^11.17.2",
+    "puppeteer-core": "^25.9.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "zod": "^3.23.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CharlesYe8848/protoflow.git"
+  },
+  "homepage": "https://github.com/CharlesYe8848/protoflow#readme",
+  "bugs": {
+    "url": "https://github.com/CharlesYe8848/protoflow/issues"
+  },
+  "keywords": [
+    "mcp",
+    "prototype",
+    "prd",
+    "ai",
+    "design"
+  ]
+}

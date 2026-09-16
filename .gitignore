@@ -1,0 +1,15 @@
+node_modules/
+*.log
+.DS_Store
+docs/local/
+docs/superpowers/
+.claude/
+.env
+.env.*
+!.env.example
+release/
+examples/**/.protoflow/
+examples/**/lib/
+examples/**/docs/**/preview.html
+examples/**/docs/**/.build/previews/
+examples/**/docs/**/.build/exported-images/

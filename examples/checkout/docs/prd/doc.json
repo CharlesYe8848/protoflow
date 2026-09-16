@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "kind": "prd",
+  "title": "购物车与支付方式",
+  "template": "prd",
+  "origin": null,
+  "head": 1,
+  "versions": [
+    {
+      "n": 1,
+      "note": "建立结账示例与截图基线",
+      "label": "",
+      "author": "ProtoFlow",
+      "builtAt": "2026-09-15T00:00:00.006Z",
+      "docHash": "4a850366aead2363",
+      "mdHash": "cc5535b6893d611b",
+      "sourceFingerprints": {
+        "ab_1789430400001": "c69e8e0e664ac2d6",
+        "ab_1789430400003": "5ad101dec91790c3"
+      },
+      "publishedTo": []
+    }
+  ],
+  "createdAt": "2026-09-15T00:00:00.004Z",
+  "updatedAt": "2026-09-15T00:00:00.006Z"
+}

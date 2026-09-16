@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "id": "checkout",
+  "name": "checkout",
+  "pageIds": [
+    "pg_1789430400000",
+    "pg_1789430400002"
+  ]
+}
