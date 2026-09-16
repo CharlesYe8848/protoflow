@@ -13,10 +13,12 @@ const projectDir = path.join(workspace, "checkout");
 fs.cpSync(source, projectDir, { recursive: true, filter: p => !["lib", ".protoflow"].includes(path.basename(p)) });
 canvasHtml(workspace, "checkout");
 renderDocPreview(workspace, "checkout", "prd");
+renderDocPreview(workspace, "checkout", "release-note");
 const opts = { projectId: "checkout", projectDir };
 console.log(JSON.stringify({
   projectDir,
   canvas: await toLocalUrl(path.join(projectDir, "canvas.html"), opts),
   prd: await toLocalUrl(path.join(projectDir, "docs/prd/preview.html"), opts),
+  releaseNote: await toLocalUrl(path.join(projectDir, "docs/release-note/preview.html"), opts),
   tip: "在浏览器打开 canvas。让 agent 使用 projectId=checkout，dir=" + workspace + " 继续编辑。",
 }, null, 2));

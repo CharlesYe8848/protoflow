@@ -1,7 +1,7 @@
 # 结账流程示例
 
 这是一个使用虚构商店、虚构商品的完整 ProtoFlow 项目。包含购物车、支付方式两个页面，
-元素标注以及带两张真实截图的 PRD v1。
+元素标注、带两张真实截图的 PRD v1，以及从 PRD 整理的上线公告 v1。
 
 ## 一分钟体验
 
@@ -12,14 +12,15 @@ npm ci
 npm run demo
 ```
 
-命令会复制示例到系统临时目录，并输出 `projectDir`、`canvas` 和 `prd`。
-打开 `canvas` 和 `prd` 链接即可；无需 MCP、平台账号或模型 API Key。
+命令会复制示例到系统临时目录，并输出 `projectDir`、`canvas`、`prd` 和 `releaseNote`。
+打开 `canvas`、`prd` 和 `releaseNote` 链接即可；无需 MCP、平台账号或模型 API Key。
 临时目录可能被系统清理，长期使用请把输出的 `projectDir` 复制到自己的工作目录。
 
 1. 在购物车页减到 0：合计变为 0，去支付禁用；加回 1 后恢复。
 2. 点击画板上的标注按钮，查看规则并点击「数量控件」等链接定位元素。
 3. 在左侧切换到支付方式页，选择支付宝，再点击支付，显示模拟成功。
 4. 打开 `prd`，查看对应截图、验收标准和修改记录。
+5. 打开 `releaseNote`，查看面向业务用户的功能说明、操作步骤和 FAQ。
 
 两个页面独立演示，不共享订单状态，不产生真实交易。
 
@@ -40,6 +41,7 @@ agent 应使用 `projectId: "checkout"`，`dir` 为该项目的父目录。修�
 
 - [项目描述](checkout/project.json)
 - [PRD 正文](checkout/docs/prd/doc.md)
+- [上线公告正文](checkout/docs/release-note/doc.md)：关联 PRD v1，保留独立版本。
 - `checkout/pages/`：页面、JSX 和标注。
 - `checkout/docs/prd/versions/1/`：初始冻结版本及截图。
 - `checkout/docs/prd/.build/`：截图清单和基线，供后续构建复用。
