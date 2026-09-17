@@ -1,4 +1,4 @@
-# ProtoFlow
+<h1><img src="docs/images/protoflow-icon.svg" alt="" width="40" height="40" align="absmiddle"> ProtoFlow</h1>
 
 **描述需求，画出原型，交付 PRD。**
 
