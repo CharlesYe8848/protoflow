@@ -12,19 +12,20 @@ template.md + writing.md），不在这里。
 ## 流程
 
 1. `get_doc_kind("<kind>")` 看该类型的模板和规范。
-2. `create_doc({ kind, docId?, from? })` 起草——`doc.md` 会按模板初始化。`docId` 缺省 = kind 名。
+2. 新文档才 `create_doc({ kind, docId?, from? })` 起草——`doc.md` 会按模板初始化。已有文档直接编辑，不重复创建。`docId` 缺省 = kind 名。
    `from:"<上游docId>"` 记来源（如上线公告基于 PRD），写进 `doc.json.origin`。
 3. 写 `doc.md` 正文。用画布截图当上下文的类型（contextSource:"canvas"，如 PRD）走截图流水线
    （见 get_guide("capture")）：`.build/captures.json` → `build_doc(mode:"snapshot")` →
    `build_publish_pack` previews/capture/seal → 截图落进 `assets/`，正文用 `![](assets/<file>)` 引用。
 4. `build_doc(mode:"finalize", note:"这一版改了什么")`：校验图片引用、算指纹、冻结成 `versions/<n>/`、
    重渲染 `preview.html`、跑该类型的 checks。
-5. `record_publish({ docId, channel, channelDocId, url? })` 登记对外发布——error 级 check finding
+5. 仅请求渠道发布且平台发布成功后，`record_publish({ docId, channel, channelDocId, url? })` 登记——error 级 check finding
    会拦截（传 `acknowledgeFindings:true` 跳过）。
 
 ## 何时定版（finalize）
 
-- 起草完初稿 → `finalize(note:"首版")`
+- 用户只要求草稿或明确暂不定版 → 保留 `doc.md`，不 finalize；阅读页仍是 head 版本
+- 起草完待交付初稿 → `finalize(note:"首版")`
 - 按一轮评审意见改完 → `finalize(note:"补充异常兜底与空态")`
 - 从上游文档派生完 → `finalize(note:"首版")`
 - `note` 就是修改记录表「修改内容」列，一句话说清这次改了什么，**不要写版本号**

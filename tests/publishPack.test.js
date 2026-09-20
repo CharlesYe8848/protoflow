@@ -86,7 +86,25 @@ test("capture 模式：action 格式不对时报 CAPTURE_BAD_ACTION，不启动�
   assert.equal(r.error.code, "CAPTURE_BAD_ACTION");
 });
 
-test("capture 模式：无头截图端到端——真的产出 PNG，视口高度按内容实际撑开", { timeout: 30000 }, async () => {
+test("previews/capture/seal：配置或快照变化后拒绝复用旧图", async () => {
+  const { ws, proj, ab, ddir } = await setupSnapshotted();
+  fs.writeFileSync(path.join(ddir, "doc.md"), "# P\n\n<!-- protoflow:changelog -->\n");
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "previews", CTX)).ok, true);
+  const imgDir = path.join(ddir, ".build", "exported-images");
+  fs.writeFileSync(path.join(imgDir, "cap-list.png"), "old");
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "seal", CTX)).ok, true);
+
+  writeCaptures(ddir, [{ id: "cap-list", artboardId: ab.id, title: "配置已变", markers: [{ elementId: "l", number: 1, label: "列表" }] }]);
+  assert.equal((await buildDoc(ws, proj.id, "prd", "finalize", { note: "不应定版" }, CTX)).error.code, "CAPTURES_STALE");
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "capture", CTX)).error.code, "PREVIEW_STALE");
+  assert.equal((await buildDoc(ws, proj.id, "prd", "finalize", { note: "不应定版" }, CTX)).error.code, "CAPTURES_NOT_SEALED");
+
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "previews", CTX)).ok, true);
+  assert.equal(fs.existsSync(path.join(ddir, ".build", "captures-manifest.json")), false);
+  assert.deepEqual(fs.readdirSync(imgDir), []);
+});
+
+test("capture 模式：无头截图端到端——真的产出 PNG，视口高度按内容实际撑开", { timeout: 90000 }, async () => {
   const { ws, proj, ddir } = await setupSnapshotted();
   await buildPublishPack(ws, proj.id, "prd", "previews", CTX);
   const r = await buildPublishPack(ws, proj.id, "prd", "capture", CTX);
@@ -96,4 +114,37 @@ test("capture 模式：无头截图端到端——真的产出 PNG，视口高�
   const imgPath = path.join(ddir, ".build", "exported-images", "cap-list.png");
   assert.ok(fs.existsSync(imgPath));
   assert.equal(fs.readFileSync(imgPath).slice(0, 8).toString("hex"), "89504e470d0a1a0a");
+});
+
+test("markers：校验配置，截图失败后不能 seal 旧图", { timeout: 90000 }, async () => {
+  const { ws, proj, ab, ddir } = await setupSnapshotted();
+  const cap = { id: "cap-list", artboardId: ab.id, markers: [{ elementId: "l", number: 1, label: "列表" }] };
+  writeCaptures(ddir, [cap]);
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "previews", CTX)).ok, true);
+  const captured = await buildPublishPack(ws, proj.id, "prd", "capture", CTX);
+  assert.equal(captured.ok, true);
+  assert.deepEqual(captured.images[0].markerDiagnostics, [{ number: 1, kind: "legend-fallback" }]);
+  assert.ok(captured.images[0].screenshotHeight > 18);
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "seal", CTX)).ok, true);
+  const image = fs.readFileSync(path.join(ddir, "assets/cap-list.png"));
+  assert.deepEqual(image, fs.readFileSync(path.join(ddir, ".build/exported-images/cap-list.png")));
+  cap.markers[0].elementId = "missing";
+  writeCaptures(ddir, [cap]);
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "capture", CTX)).error.code, "PREVIEW_STALE");
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "previews", CTX)).ok, true);
+  const bad = await buildPublishPack(ws, proj.id, "prd", "capture", CTX);
+  assert.equal(bad.error.code, "CAPTURE_FAILED");
+  assert.match(bad.error.message, /cap-list.*missing/);
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "seal", CTX)).error.code, "IMAGE_MISSING");
+});
+
+test("capture validation invalidates old images and seal manifest", async () => {
+  const { ws, proj, ab, ddir } = await setupSnapshotted();
+  await buildPublishPack(ws, proj.id, "prd", "previews", CTX);
+  fs.writeFileSync(path.join(ddir, ".build/exported-images/cap-list.png"), "old");
+  await buildPublishPack(ws, proj.id, "prd", "seal", CTX);
+  writeCaptures(ddir, [{ id: "cap-list", artboardId: ab.id, actions: [{ type: "bogus" }] }]);
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "capture", CTX)).error.code, "CAPTURE_BAD_ACTION");
+  assert.equal((await buildPublishPack(ws, proj.id, "prd", "seal", CTX)).error.code, "PREVIEW_STALE");
+  assert.equal(fs.existsSync(path.join(ddir, ".build/captures-manifest.json")), false);
 });

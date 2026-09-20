@@ -52,6 +52,13 @@ test("create_doc：不传 title/docId 时 docId 退回 = kind 名，按模板起
   assert.ok(fs.readFileSync(path.join(ddir(ws, proj.id), "doc.md"), "utf8").includes("<!-- protoflow:changelog -->"));
 });
 
+test("create_doc：上线公告 FAQ 模板让答案硬换行显示", () => {
+  const { ws, proj } = setup();
+  createDoc(ws, proj.id, { kind: "release-note" }, CTX);
+  const md = fs.readFileSync(path.join(ddir(ws, proj.id, "release-note"), "doc.md"), "utf8");
+  assert.match(md, /\*\*Q：\[问题1\]？\*\*<br>\nA：\[答案\]/);
+});
+
 test("create_doc：传 title 只填内容不改目录——目录名仍是 docs/prd/，doc.md 一级标题和 doc.json.title 自动填成该句", () => {
   const { ws, proj } = setup();
   const r = createDoc(ws, proj.id, { kind: "prd", title: "推荐候选人卡片与通用详情侧栏" }, CTX);
@@ -253,7 +260,7 @@ test("preview：置顶通用工具栏（返回画布 + 版本切换器，右上�
   assert.ok(html.includes('class="pf-hdr-home" href="../../canvas.html"'), "返回画布入口");
   assert.ok(!html.includes("pf-hdr-kind"), "旧的右上角类型标签已拿掉");
   assert.ok(html.includes('class="pf-hdr-share"') && html.includes("__protoflow_export/doc/"), "右上角改成「导出」按钮，POST 到导出端点");
-  assert.ok(html.includes('class="pf-export-menu"') && html.includes('data-format="zip"') && html.includes('data-format="html"'), "导出按钮点开菜单，两行分别对应 zip/html");
+  assert.ok(html.includes('class="pf-export-menu"') && html.includes('data-format="docx"') && html.includes('data-format="html"') && html.includes('data-format="markdown"'), "导出菜单对应 Word、HTML 和 Markdown");
   // 单篇项目：菜单退化成纯版本列表（structured=false），版本行仍带标题
   assert.ok(html.includes('var __PF_KIND__ = "prd";') && html.includes('var __PF_KIND_LABEL__ = "PRD";'));
   assert.ok(html.includes("var structured = SIB.length > 0;"));
@@ -306,6 +313,33 @@ test("preview：多类型项目——左上角菜单按类型分组，当前文�
   assert.ok(html.includes('class="pf-vsel-dot"') && html.includes(".pf-vsel-dot{") && html.includes("border-radius:50%"), "当前版本用黑色小圆点标记，不写「当前」二字");
   assert.ok(!html.includes('<span class="cur">当前</span>'), "旧的「当前」文字标记已移除");
   assert.ok(!html.includes("同类其他文档"), "旧的「同类其他文档」小标题被类型分组取代");
+});
+
+test("finalize：新增文档后重渲染同项目已有文档，菜单自动补齐入口", async () => {
+  const { ws, proj, ab } = setup();
+
+  createDoc(ws, proj.id, { kind: "prd", title: "推荐候选人卡片" }, CTX);
+  await sealOneCapture(ws, proj.id, ab);
+  writeMd(ws, proj.id, "# 推荐候选人卡片\n\n正文\n\n![x](assets/cap-a.png)\n");
+  await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
+
+  const prdPreview = path.join(ddir(ws, proj.id, "prd"), "preview.html");
+  assert.deepEqual(
+    JSON.parse(fs.readFileSync(prdPreview, "utf8").match(/var __PF_SIBLINGS__ = (\[[\s\S]*?\]);\n/)[1]),
+    [],
+  );
+
+  createDoc(ws, proj.id, { kind: "release-note", title: "【招聘】推荐候选人卡片上线" }, CTX);
+  writeMd(ws, proj.id, "# 【招聘】推荐候选人卡片上线\n\n正文\n", "release-note");
+  await buildDoc(ws, proj.id, "release-note", "finalize", { note: "首版" }, CTX);
+
+  const siblings = JSON.parse(
+    fs.readFileSync(prdPreview, "utf8").match(/var __PF_SIBLINGS__ = (\[[\s\S]*?\]);\n/)[1],
+  );
+  assert.deepEqual(
+    siblings.map((s) => [s.id, s.kindLabel, s.title]),
+    [["release-note", "上线公告", "【招聘】推荐候选人卡片上线"]],
+  );
 });
 
 test("preview：版本切换在页内完成，不跳转页面（SPA：history + 重渲染，无 location.href 赋值）", async () => {

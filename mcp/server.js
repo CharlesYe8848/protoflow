@@ -36,10 +36,10 @@ export function resolveAuthor(env = process.env) {
 
 export function buildInstructions() {
   return [
-    "ProtoFlow：原型（画板 JSX）→ 标注 → PRD 版本 → 发布包 → 渠道文档 的全链路工具。",
-    "每层产物登记上游内容指纹，chain_status 随时算出过期行动清单（改了原型后必跑）。",
+    "ProtoFlow：创建和修改可点击的产品原型、元素标注，以及基于原型交付带截图的 PRD 和上线说明。已有项目沿用原结构；纯需求讨论或生产应用开发不自动创建项目。",
+    "chain_status 只读计算变更影响，不更新校验基线；修改后检查，只检查时不自动修复或发布。",
     "你负责写内容（JSX/标注/captures.json/PRD.md），工具负责校验、登记、构建、组包。",
-    '首次使用先调 get_guide("workflow") 了解完整流程；各环节写作规范见 get_guide 的对应主题。',
+    '首次使用先调 get_guide({topic:"workflow"})，按场景选择必要步骤；写作规范按需读取对应主题。只交付用户要求的产物。',
   ].join("\n");
 }
 

@@ -43,16 +43,19 @@
 
 - `lastValidatedHash` / `annotationsValidatedHash`（meta.json）、`doc.json` 里的 `docHash`/
   `mdHash`/`head` 都是工具算出来的，**不要手改**。改完 `source.jsx` / `annotations.md` / `doc.md`
-  重新跑一次链路检查让工具重算即可。
-- 手改 `source.jsx` / `annotations.md` / `doc.md` 是安全的，也不需要之后手动"重新渲染"——预览是实时投影，刷新
-  浏览器即最新；只有链路健康字段（见上）要靠跑一次 `chain_status` 让工具重算。`versions/<n>/`
-  是冻结的历史，不要改。
+  用 `chain_status` 检查影响；它只读计算差异，**不会更新校验基线**。源码通过
+  `save_artboard_source` 编译保存，标注实际核对后用 `write_annotations` 保存，文档按交付需要 finalize。
+- 手改 `source.jsx` / `annotations.md` 后原型预览刷新即最新；手改 `doc.md` 只改变草稿，
+  文档阅读页仍显示 head 版本，finalize 后才更新。`versions/<n>/` 是冻结历史，不要改。
 - 版本只由显式 `build_doc(mode:"finalize", note:"…")` 产生，不是每次编辑自动切。什么时候该
   finalize 见该类型的 `get_doc_kind` 里的 writing.md。
 
 ## 怎么驱动这个项目
 
-**方式一**：当前 agent 已挂载 protoflow 这个 MCP，直接说需求即可；模型会先调 `get_guide("workflow")`。
+先沿用当前项目，不重新创建同名项目；项目 id 是 `checkout`，`dir` 是这个文件夹的父目录。
+用 `get_project` 获取结构，按任务读取相关源码和文档。局部修改不重开需求访谈，预览或检查不自动定版或发布。
+
+**方式一**：当前 agent 已挂载 protoflow MCP，先调 `get_guide({topic:"workflow"})` 按场景进入。
 
 **方式二**：没挂 MCP 时用同一份代码的非交互 CLI（命令名和参数跟 MCP 工具一一对应，项目 id 就是
 这个文件夹的名字 `checkout`）。在这个文件夹内运行：

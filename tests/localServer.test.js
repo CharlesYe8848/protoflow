@@ -357,3 +357,24 @@ test("HTTP 拒绝外部 Host 和跨站写入，接受本地同源请求", async 
   assert.ok(!fs.existsSync(path.join(dir, ".protoflow")));
   assert.equal((await fetch(base + "/p/P/__protoflow_state/canvas", { method: "POST", headers: { Origin: base }, body: "{}" })).status, 200);
 });
+
+test("异步导出返回下载文件，异步错误返回 500", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-async-export-"));
+  const server = await listen(createStaticHandler("secret", undefined, null, async (_root, sub) => {
+    await Promise.resolve();
+    if (sub === "doc/prd/fail") throw new Error("Word 生成失败");
+    return { filename: "测试.docx", buffer: Buffer.from("word-bytes"), mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" };
+  }));
+  t.after(() => { server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const { key } = await register(port, "secret", "export", dir);
+  const base = `http://127.0.0.1:${port}/p/${key}/__protoflow_export/doc/prd`;
+  const response = await fetch(base + "/docx", { method: "POST" });
+  assert.equal(response.status, 200);
+  assert.match(response.headers.get("content-type"), /wordprocessingml/);
+  assert.match(response.headers.get("content-disposition"), /\.docx/);
+  assert.equal(await response.text(), "word-bytes");
+  const failed = await fetch(base + "/fail", { method: "POST" });
+  assert.equal(failed.status, 500);
+  assert.match(await failed.text(), /Word 生成失败/);
+});

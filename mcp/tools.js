@@ -12,6 +12,7 @@ import { importProject } from "../core/importer.js";
 import { toLocalUrl } from "../core/localServer.js";
 import { resolveKind, listKinds } from "../core/docKinds.js";
 import { runChecks } from "../core/checkRunner.js";
+import { runProjectExport } from "../core/exportService.js";
 import { EXPORT_TARGETS } from "../core/exportFormats.js";
 
 const fail = (code, message, hint) => ({ ok: false, error: { code, message, ...(hint ? { hint } : {}) } });
@@ -225,14 +226,13 @@ export const TOOL_REGISTRY = [
   },
   {
     name: "build_publish_pack",
-    description: "截图流水线三阶段（PRD/上线公告等用画布截图当上下文的类型的 sidecar）。previews：校验 docs/<docId>/.build/captures.json 并渲染 .build/previews/<captureId>.html，每个 capture 返回的 url（http://127.0.0.1）给浏览器工具打开、按 actions 操作后截图；capture：可选的自动化截图——无头浏览器（本机 Chrome，找不到才下载，不弹窗）按 actions 操作后按内容真实高度截图，写 .build/exported-images/<captureId>.png；actions 表达不了的复杂交互可跳过这步手动截图放同一位置。seal：核对图片清单，把截图落进 docs/<docId>/assets/<captureId>.png + 写 .build/captures-manifest.json（doc.md 用 ![](assets/<captureId>.png) 引用）",
+    description: "截图流水线三阶段（PRD/上线公告等用画布截图当上下文的类型的 sidecar）。previews：校验 docs/<docId>/.build/captures.json 并渲染 .build/previews/<captureId>.html，每个 capture 返回的 url（http://127.0.0.1）给浏览器工具打开、按 actions 操作后截图；capture：可选的自动化截图——无头浏览器（本机 Chrome，找不到才下载，不弹窗）按 actions 操作后按内容真实高度截图，可通过 captures.json 的 markers（elementId、number、label；可选 placement、display、offset）叠加定位标记。默认自动避让标签，密集区域降级为编号与图例；模型可按画面指定方位。产物写 .build/exported-images/<captureId>.png；actions 表达不了的复杂交互可跳过这步手动截图放同一位置。seal：核对图片清单，把截图落进 docs/<docId>/assets/<captureId>.png + 写 .build/captures-manifest.json（doc.md 用 ![](assets/<captureId>.png) 引用）",
     schema: { ...pid, docId: z.string(), mode: z.enum(["previews", "capture", "seal"]) },
     handler: async (a, ctx) => {
       const r = await buildPublishPack(ctx.ws, a.projectId, a.docId, a.mode, ctx);
       if (!r.ok || r.mode !== "previews") return r;
       const projectDir = store.projectDir(ctx.ws, a.projectId);
-      // 截图是画板某个状态的干净图（标注说明另在画布左侧侧边栏 / 直接写进 PRD 正文，不再往截图
-      // 上叠编号气泡）——按 actions 操作后原样截。
+      // 自动 capture 可根据 captures.json 的 markers 叠加定位框与编号短名称。
       const previews = await Promise.all(r.previews.map((p) => withUrl(a.projectId, projectDir, p.htmlPath, p)));
       return { ...r, previews };
     },
@@ -285,16 +285,15 @@ export const TOOL_REGISTRY = [
   },
   {
     name: "export_doc",
-    description: "把一篇文档的当前（head）版本导出成一个文件，写到 outDir 下（文件名自动取文档标题）。format=\"zip\"（默认）导出目录树（preview.html + lib/ + assets/，不带历史版本、不带版本切换）；format=\"html\" 导出单个自包含 .html（marked/mermaid、图片全内联，双击即看）；format=\"markdown\" 导出单个 .md（图片内联成 data URI，不依赖 assets/ 目录，可直接粘贴/导入钉钉文档等其它工具）。不需要 protoflow 的预览服务。跟文档阅读页右上角「导出」按钮菜单同一份逻辑，区别是按钮触发浏览器下载、这个工具直接写到你指定的目录",
+    description: "把一篇文档的当前（head）版本导出成一个文件，写到 outDir 下（文件名自动取文档标题）。format=\"docx\" 导出可编辑 Word；format=\"zip\"（默认，兼容旧调用）导出目录树（preview.html + lib/ + assets/，不带历史版本、不带版本切换）；format=\"html\" 导出单个自包含 .html（marked/mermaid、图片全内联，双击即看）；format=\"markdown\" 导出一个 .zip（<标题>.md + assets/ 真实图片文件，图片引用是相对路径、不转 data URI，比 html 更通用，便于导入飞书文档、钉钉文档等其它工具）。不需要 protoflow 的预览服务。跟文档阅读页右上角「导出」按钮菜单同一份逻辑，区别是按钮触发浏览器下载、这个工具直接写到你指定的目录",
     schema: {
       ...pid,
       docId: z.string(),
-      format: z.enum(["zip", "html", "markdown"]).optional().describe("导出格式，默认 zip（目录树）；html 是单文件；markdown 是纯 .md 文件"),
+      format: z.enum(["zip", "html", "markdown", "docx"]).optional().describe("导出格式，默认 zip（目录树）；docx 是可编辑 Word；html 是单文件；markdown 是 .md + assets/ 图片的 .zip 包"),
       outDir: z.string().describe("文件要写到的目录（绝对路径，或相对 dir 参数解析）；目录不存在会自动创建"),
     },
-    handler: (a, ctx) => {
-      const fmt = EXPORT_TARGETS.doc.formats.find((f) => f.id === (a.format || "zip"));
-      const out = fmt.build(ctx.ws, a.projectId, a.docId);
+    handler: async (a, ctx) => {
+      const out = await runProjectExport(path.join(ctx.ws, a.projectId), `doc/${encodeURIComponent(a.docId)}/${a.format || "zip"}`);
       if (!out) return fail("DOC_NOT_BUILT", `文档 ${a.docId} 尚未 build_doc(mode:"finalize")，没有任何版本可导出`);
       const outPath = path.resolve(a.outDir, out.filename);
       fs.mkdirSync(path.dirname(outPath), { recursive: true });

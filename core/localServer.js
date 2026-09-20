@@ -150,7 +150,10 @@ function isLocalRequest(req) {
   const hosts = new Set([`127.0.0.1:${req.socket.localPort}`, `localhost:${req.socket.localPort}`]);
   if (!hosts.has(req.headers.host)) return false;
   if (req.headers.origin && req.headers.origin !== `http://${req.headers.host}`) return false;
-  return req.headers["sec-fetch-site"] !== "cross-site";
+  if (req.headers["sec-fetch-site"] !== "cross-site") return true;
+  // 跨站也放行顶层文档导航（用户从别的页面/插件点链接跳过来的场景）——真正有泄露风险的
+  // 是脚本发起的 fetch/XHR/img/iframe，那些的 Sec-Fetch-Dest 不会是 "document"，仍然会被挡。
+  return req.headers["sec-fetch-mode"] === "navigate" && req.headers["sec-fetch-dest"] === "document";
 }
 
 export function resolveStatusPath(override) {
@@ -303,7 +306,7 @@ export function createStaticHandler(secret, renderView = () => null, projectsPat
   // 注入（core/exportService.js），返回 { filename, buffer, mime }——一份文件的字节，不落盘到
   // 项目目录（落盘只发生在系统临时目录，打完包立刻删）。响应直接把字节发回去，浏览器那边走
   // "另存为"选目录，不是我们替用户定一个固定导出路径。
-  function handleExport(res, rawKey, rawSub) {
+  async function handleExport(res, rawKey, rawSub) {
     let key, sub;
     try { key = decodeURIComponent(rawKey); sub = decodeURIComponent(rawSub); }
     catch { res.writeHead(400, { "Content-Type": "text/plain" }).end("Bad Request"); return; }
@@ -311,7 +314,7 @@ export function createStaticHandler(secret, renderView = () => null, projectsPat
     if (!root) { res.writeHead(404, { "Content-Type": "text/plain" }).end("Not Found"); return; }
     if (sub.includes("..") || sub.includes("\0")) { res.writeHead(400, { "Content-Type": "text/plain" }).end("Bad Request"); return; }
     let out;
-    try { out = runExport(root, sub); }
+    try { out = await runExport(root, sub); }
     catch (e) {
       const msg = "导出失败: " + String((e && e.message) || e);
       res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8", "Content-Length": Buffer.byteLength(msg) });

@@ -8,7 +8,7 @@
 // 重新跑 render，也不再有"落盘的 HTML 和源文件不一致"这种中间状态。
 //
 // 只认这两类动态路径，其余（source.jsx、assets/*、lib/*、.protoflow/*.json、docs/<id>/preview.html
-// ——doc 阅读页是 build_doc(finalize) 冻结版本内容的产物，不是源文件的投影）返回 null，交回
+// ——doc 阅读页只更新导出菜单，正文仍是冻结版本）除菜单刷新外返回 null，交回
 // core/localServer.js 的静态文件通道：
 //   canvas.html
 //   pages/<pageId>/artboards/<artboardId>/preview.html
@@ -16,6 +16,9 @@
 // core/localServer.js 保持通用（静态文件 + register + __protoflow_state），不 import 本模块；
 // bin/protoflow-server.mjs 在入口处把这个函数作为 renderView 传进 createStaticHandler。
 import path from "node:path";
+import fs from "node:fs";
+import { EXPORT_MENU } from "./exportMenu.js";
+import { exportMenuRowsHtml } from "./preview.js";
 import { canvasHtml, artboardPreviewHtml } from "./store.js";
 
 const PREVIEW_RE = /^pages\/([^/]+)\/artboards\/([^/]+)\/preview\.html$/;
@@ -28,6 +31,15 @@ export function renderProjectView(projectRoot, relPath) {
   const projectId = path.basename(projectRoot);
 
   if (relPath === "canvas.html") return canvasHtml(ws, projectId);
+
+  // Refresh only the menu of frozen document previews; preserve all version content.
+  if (/^docs\/[^/]+\/preview\.html$/.test(relPath)) {
+    const file = path.join(projectRoot, relPath);
+    if (!fs.existsSync(file)) return null;
+    const html = fs.readFileSync(file, "utf8");
+    return html.replace(/(<div class="pf-export-menu" hidden><div class="pf-export-menu__section">导出<\/div>)[\s\S]*?(<\/div>)/,
+      (_match, start, end) => start + exportMenuRowsHtml(EXPORT_MENU.doc) + end);
+  }
 
   const m = PREVIEW_RE.exec(relPath);
   if (m) return artboardPreviewHtml(ws, projectId, m[2]);

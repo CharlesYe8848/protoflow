@@ -261,6 +261,11 @@ test("export_doc：写到 outDir 下，文件名 = 文档标题 + .zip；无版�
   assert.equal(r.path, path.join(outDir, "t.zip"));
   assert.ok(fs.existsSync(r.path) && fs.statSync(r.path).size === r.bytes);
 
+  const word = await call("export_doc", { projectId: proj.id, docId: "prd", outDir, format: "docx" }, c);
+  assert.equal(word.ok, true);
+  assert.equal(word.path, path.join(outDir, "t.docx"));
+  assert.ok(fs.statSync(word.path).size > 0);
+
   const proj2 = await call("create_project", { name: "T2" }, c);
   await call("create_doc", { projectId: proj2.id, kind: "prd" }, c);
   const noVersion = await call("export_doc", { projectId: proj2.id, docId: "prd", outDir }, c);

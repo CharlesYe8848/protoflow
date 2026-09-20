@@ -22,7 +22,28 @@ npm ci
 
 想先看效果？运行 `npm run demo`，打开终端输出的原型、PRD 和上线公告链接，无需连接 AI。
 
-### 连接 AI 助手
+### 安装场景技能
+
+将仓库中的 [`skills/protoflow`](skills/protoflow/SKILL.md) 文件夹安装到助手的技能目录。
+这是 ProtoFlow 唯一的主 Skill，覆盖创建和修改原型、元素标注、交付文档、预览与导出等场景，
+让助手能在“做可点击原型”“根据原型整理评审文档”等请求中主动选择 ProtoFlow。
+主 Skill 负责场景选择，下面的 MCP 或 CLI 提供实际工具；两者都需要可用。
+
+Codex 用户可在本仓库根目录执行以下命令（自定义 `CODEX_HOME` 时使用对应目录）：
+
+```bash
+mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
+if [ ! -e "${CODEX_HOME:-$HOME/.codex}/skills/protoflow" ]; then
+  cp -R skills/protoflow "${CODEX_HOME:-$HOME/.codex}/skills/protoflow"
+else
+  echo "ProtoFlow 技能已存在，请先比较内容，再决定是否替换。"
+fi
+```
+
+其他助手通过其技能安装入口添加同一个文件夹。安装后重新打开会话，确认技能目录中出现
+`protoflow`。技能不含运行时，也不会自动安装依赖或修改 MCP 配置。
+
+### 连接工具
 
 通过 MCP（让 AI 调用外部工具的接口）接入。选择你使用的助手，将 `/path/to/protoflow` 替换为 ProtoFlow 文件夹的**绝对路径**：
 
@@ -68,13 +89,14 @@ args = ["/path/to/protoflow/mcp/server.js"]
 
 </details>
 
-配置后重新打开助手会话，即可开始使用。
+配置后重新打开助手会话，确认 ProtoFlow 技能和工具均已加载。
+连接诊断与 CLI 备用方式见[使用说明](docs/usage.md#技能与工具连接检查)。
 
 ## 试着这样说
 
 **创建原型**
 
-> 用 ProtoFlow 画一个购物车结账流程：购物车页展示商品、数量和合计，支付页支持微信、支付宝和银行卡。做好后给我预览链接。
+> 做一个可点击演示的购物车结账原型：购物车页展示商品、数量和合计，支付页支持微信、支付宝和银行卡。做好后给我预览链接。
 
 **修改并整理文档**
 
@@ -121,7 +143,8 @@ ProtoFlow 把原型、元素标注、截图和文档关联起来，让一次交�
 
 > 把原型导出成一个可直接打开的 HTML 文件，再把 PRD 导出为 Markdown。
 
-支持 HTML、ZIP 和文档 Markdown 导出。把导出的文件发给同事即可；本地预览链接仅在你的电脑上有效。
+画布支持项目 ZIP 和单页 HTML；文档支持 Word、单页 HTML 和带图片的 Markdown 压缩包。
+把导出的文件发给同事即可；本地预览链接仅在你的电脑上有效。
 
 ## 更多
 

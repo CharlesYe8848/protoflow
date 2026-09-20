@@ -152,7 +152,8 @@ body{margin:0;background:#f6f7fb;color:#0f172a;font-family:"PingFang SC","Micros
 .doc h2{font-size:21px;margin-top:36px}
 .doc h3{font-size:17px;margin-top:28px}
 .doc img{max-width:100%;border:1px solid #e2e8f0;border-radius:8px;display:block;margin:12px 0}
-.doc table{border-collapse:collapse;width:100%;margin:16px 0}
+.pf-table-scroll{width:100%;max-width:100%;margin:16px 0;overflow-x:auto;overscroll-behavior-inline:contain}
+.doc table{border-collapse:collapse;width:100%;margin:0}
 .doc th,.doc td{border:1px solid #e2e8f0;padding:8px 12px;text-align:left}
 .doc th{background:#f8fafc;font-weight:600}
 .doc code{background:#f1f5f9;border-radius:4px;padding:1px 6px;font-size:.9em}
@@ -412,6 +413,18 @@ function appScript({ compressedLibs = false } = {}) {
   function render(n){
     var v = byN[n] || byN[HEAD]; n = v.n;
     docEl.innerHTML = marked.parse(injectChangelog(v.md, n));
+    // CSS table layout may grow past width:100% when a cell contains an unbreakable identifier or URL.
+    // Keep that intrinsic width for readability, but contain it in the document card instead of letting the
+    // entire page overflow horizontally. The focusable region also gives keyboard users access to scrolling.
+    docEl.querySelectorAll("table").forEach(function(table){
+      var wrap = document.createElement("div");
+      wrap.className = "pf-table-scroll";
+      wrap.tabIndex = 0;
+      wrap.setAttribute("role", "region");
+      wrap.setAttribute("aria-label", "表格，可横向滚动");
+      table.parentNode.insertBefore(wrap, table);
+      wrap.appendChild(table);
+    });
     buildToc();
     if (__PF_ANY_MERMAID__) renderMermaid();
     updateBar(n);

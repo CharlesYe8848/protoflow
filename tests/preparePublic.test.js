@@ -19,12 +19,16 @@ function fixture(t) {
 test("公开快照只带允许的当前文件；不复制历史、内部文档和被忽略的产物，不覆盖已有目录", t => {
   const { temp, root, write, run } = fixture(t);
   write("README.md", "public"); write("core/main.js", "export const ready = true;");
+  write("skills/protoflow/SKILL.md", "skill entry");
+  write("docs/skill-evaluation.md", "routing cases");
   write("docs/superpowers/private.md", "private"); write(".claude/RESUME.md", "private");
   write(".gitignore", "examples/**/lib/\n"); write("examples/checkout/lib/generated.js", "generated");
   execFileSync("git", ["add", "."], { cwd: root });
   const dest = path.join(temp, "public");
   const result = run(dest); assert.equal(result.status, 0, result.stderr);
   assert.equal(fs.readFileSync(path.join(dest, "README.md"), "utf8"), "public");
+  assert.equal(fs.readFileSync(path.join(dest, "skills/protoflow/SKILL.md"), "utf8"), "skill entry");
+  assert.equal(fs.readFileSync(path.join(dest, "docs/skill-evaluation.md"), "utf8"), "routing cases");
   for (const name of [".git", ".claude", "docs/superpowers", "examples/checkout/lib"]) assert.equal(fs.existsSync(path.join(dest, name)), false, name);
   fs.writeFileSync(path.join(dest, "README.md"), "keep");
   assert.notEqual(run(dest).status, 0); assert.equal(fs.readFileSync(path.join(dest, "README.md"), "utf8"), "keep");

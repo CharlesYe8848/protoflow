@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { contentHash, objectHash } from "./hash.js";
+import { captureInputHash } from "./captureProvenance.js";
 import { isValidDocId } from "./ids.js";
 import * as store from "./store.js";
 import { copyPreviewLibs, buildPreviewHtml, readAssetsMap } from "./preview.js";
@@ -168,6 +169,10 @@ async function buildFinalize(ws, pid, docId, opts, ctx) {
     const manifestPath = path.join(dir, ".build", "captures-manifest.json");
     if (!fs.existsSync(manifestPath)) return fail("CAPTURES_NOT_SEALED", `${docId} 尚未 build_publish_pack(mode:"seal")`, "workflow");
     const capManifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+    const captures = JSON.parse(fs.readFileSync(capsPath, "utf8")).captures || [];
+    if (!capManifest.inputHash || capManifest.inputHash !== captureInputHash(path.join(dir, ".build"), captures)) {
+      return fail("CAPTURES_STALE", `${docId} 的截图配置、快照与已 seal 图片不一致，请重新运行截图流水线`, "capture");
+    }
     const sealedArtboards = [...new Set((capManifest.images || []).map((i) => i.artboardId).filter(Boolean))];
     for (const aid of sealedArtboards) {
       const srcPath = path.join(snapArts, aid, "source.jsx");
@@ -204,8 +209,14 @@ async function buildFinalize(ws, pid, docId, opts, ctx) {
   dj.title = h1Title(md, dj.title || docId);
   store.writeDocJson(ws, pid, docId, dj);
 
-  // 全量重渲染 preview.html（每个版本页 + 文档根）——新版本出现后旧版本页的切换器列表要一起更新
-  const rendered = store.renderDocPreview(ws, pid, docId);
+  // 重渲染同项目所有已定版文档。文档菜单的 siblings 来自项目当前文档清单；如果只渲染本篇，
+  // 先定版的文档不会自动出现后来新增/改名的文档入口。
+  let rendered = { rendered: false };
+  for (const doc of store.listDocs(ws, pid)) {
+    if (!doc.head) continue;
+    const result = store.renderDocPreview(ws, pid, doc.id);
+    if (doc.id === docId) rendered = result;
+  }
 
   // 清掉可再生的截图中间产物；保留 captures.json / captures-manifest.json / snapshot（供纯 prose
   // 改动时的下一次 finalize 复用、也是画板漂移检测的基线）。

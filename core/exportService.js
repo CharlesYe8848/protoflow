@@ -16,6 +16,7 @@
 // 「导出」按钮点出来还是旧的不带格式段的 URL，得继续认得出来，不然要等用户对着每篇文档重新
 // build_doc 一遍旧文档的导出才会恢复——不能指望这一点，兼容旧 URL 更稳。
 import path from "node:path";
+import { buildDocExportZip } from "./exportDoc.js";
 import { EXPORT_TARGETS } from "./exportFormats.js";
 
 const CANVAS_RE = /^canvas(?:\/([^/]+))?$/;
@@ -35,10 +36,16 @@ export function runProjectExport(projectRoot, subPath) {
   else if (dm) { target = "doc"; docId = decodeURIComponent(dm[1]); formatId = dm[2] || "zip"; }
   else return null;
 
+  // Frozen older previews still request ZIP, including URLs without a format.
+  if (target === "doc" && formatId === "zip") {
+    const out = buildDocExportZip(ws, projectId, docId);
+    return out ? { ...out, mime: "application/zip" } : null;
+  }
+
   const fmt = ((EXPORT_TARGETS[target] || {}).formats || []).find((f) => f.id === formatId);
   if (!fmt || !fmt.build) return null;
 
   const out = target === "canvas" ? fmt.build(ws, projectId) : fmt.build(ws, projectId, docId);
-  if (!out) return null;
-  return { filename: out.filename, buffer: out.buffer, mime: out.mime || fmt.mime };
+  const response = (result) => result ? { filename: result.filename, buffer: result.buffer, mime: result.mime || fmt.mime } : null;
+  return out instanceof Promise ? out.then(response) : response(out);
 }

@@ -25,8 +25,8 @@ if (!relative || (!relative.startsWith(".." + path.sep) && relative !== ".." && 
 }
 if (fs.existsSync(destination)) throw new Error("发布目录已存在；为保护已有内容，请换一个新目录");
 const rootFiles = new Set([".gitignore", ".nvmrc", "README.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md", "package.json", "package-lock.json"]);
-const directories = [".github/", "bin/", "core/", "mcp/", "guides/", "doc-kinds/", "tests/", "examples/", "scripts/", "docs/images/"];
-const docs = new Set(["docs/usage.md", "docs/architecture-notes.md", "docs/release-v0.1.0.md", "docs/releasing.md"]);
+const directories = [".github/", "bin/", "core/", "mcp/", "guides/", "skills/", "doc-kinds/", "tests/", "examples/", "scripts/", "docs/images/"];
+const docs = new Set(["docs/usage.md", "docs/skill-evaluation.md", "docs/architecture-notes.md", "docs/release-v0.1.0.md", "docs/releasing.md"]);
 const candidates = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "-z"], { cwd: root }).toString().split("\0").filter(Boolean);
 const files = [...new Set(candidates)].filter(name => rootFiles.has(name) || docs.has(name) || directories.some(dir => name.startsWith(dir))).sort();
 const secretPatterns = [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/, /\bgh[pousr]_[A-Za-z0-9]{30,}\b/, /\bsk-[A-Za-z0-9_-]{30,}\b/];

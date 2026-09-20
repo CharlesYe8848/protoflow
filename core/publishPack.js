@@ -6,6 +6,8 @@
 //   seal     — 核对图片清单，把截图落进 docs/<docId>/assets/<captureId>.png + 写 .build/captures-manifest.json
 import fs from "node:fs";
 import path from "node:path";
+import { applyCaptureMarkers, validateMarkers } from "./captureMarkers.js";
+import { captureInputHash, readInputManifest } from "./captureProvenance.js";
 import * as store from "./store.js";
 import { buildPreviewHtml } from "./preview.js";
 import { resolveBrowserExecutable } from "./headlessBrowser.js";
@@ -15,6 +17,12 @@ const fail = (code, message, hint) => ({ ok: false, error: { code, message, ...(
 export async function buildPublishPack(ws, projectId, docId, mode, ctx) {
   const ddir = store.docDir(ws, projectId, docId);
   const buildDir = path.join(ddir, ".build");
+  if (mode === "capture") {
+    // Invalidate even when config/action/preview validation fails.
+    fs.rmSync(path.join(buildDir, "exported-images"), { recursive: true, force: true });
+    fs.rmSync(path.join(buildDir, "exported-images-manifest.json"), { force: true });
+    fs.rmSync(path.join(buildDir, "captures-manifest.json"), { force: true });
+  }
   if (!fs.existsSync(path.join(buildDir, "snapshot", "artboards"))) {
     return fail("VERSION_NOT_BUILT", `文档 ${docId} 尚未 build_doc(mode:"snapshot")`, "workflow");
   }
@@ -27,6 +35,8 @@ export async function buildPublishPack(ws, projectId, docId, mode, ctx) {
     if (!c.id || !/^[a-z0-9][a-z0-9-]*$/.test(c.id)) return fail("CAPTURE_BAD_ID", `capture id 不合法: ${c.id}`);
     if (ids.has(c.id)) return fail("CAPTURE_DUP_ID", `capture id 重复: ${c.id}`);
     ids.add(c.id);
+    const markerError = validateMarkers(c.markers);
+    if (markerError) return fail("CAPTURE_BAD_MARKER", `capture ${c.id}：${markerError}`);
   }
   if (mode === "previews") return buildPreviews(buildDir, captures);
   if (mode === "capture") return captureAll(buildDir, captures);
@@ -42,6 +52,9 @@ function buildPreviews(buildDir, captures) {
     }
   }
   const outDir = path.join(buildDir, "previews");
+  fs.rmSync(path.join(buildDir, "exported-images"), { recursive: true, force: true });
+  fs.rmSync(path.join(buildDir, "exported-images-manifest.json"), { force: true });
+  fs.rmSync(path.join(buildDir, "captures-manifest.json"), { force: true });
   fs.rmSync(outDir, { recursive: true, force: true });
   fs.mkdirSync(outDir, { recursive: true });
   for (const c of captures) {
@@ -53,6 +66,10 @@ function buildPreviews(buildDir, captures) {
       buildPreviewHtml({ artboardId: c.artboardId, source, libRelPath: "../../../../lib", annotationsMd }));
   }
   fs.mkdirSync(path.join(buildDir, "exported-images"), { recursive: true });
+  fs.writeFileSync(path.join(buildDir, "previews-manifest.json"), JSON.stringify({
+    schemaVersion: 1,
+    inputHash: captureInputHash(buildDir, captures),
+  }, null, 2));
   return { ok: true, mode: "previews", previews: captures.map((c) => ({ captureId: c.id, artboardId: c.artboardId, title: c.title, actions: c.actions || [], htmlPath: path.join(outDir, `${c.id}.html`) })) };
 }
 
@@ -78,15 +95,45 @@ async function runActions(page, actions) {
   }
 }
 
-async function captureOne(browser, htmlPath, canvasWidth, actions, destPath) {
+async function captureOne(browser, htmlPath, canvasWidth, actions, markers, destPath) {
   const page = await browser.newPage();
   try {
     await page.setViewport({ width: canvasWidth, height: 900, deviceScaleFactor: 2 });
     await page.goto(`file://${htmlPath}`, { waitUntil: "networkidle0" });
     await runActions(page, actions);
-    const height = await page.evaluate(() => Math.ceil(document.getElementById("root")?.scrollHeight || document.body.scrollHeight));
-    await page.setViewport({ width: canvasWidth, height: Math.max(height, 1), deviceScaleFactor: 2 });
-    await page.screenshot({ path: destPath, type: "png" });
+    await page.evaluate(() => document.fonts.ready);
+    let height = 1;
+    for (let i = 0; i < 4; i++) {
+      const measured = await page.evaluate(() => Math.ceil(document.getElementById("root")?.scrollHeight || document.body.scrollHeight));
+      height = Math.max(height, measured);
+      await page.setViewport({ width: canvasWidth, height, deviceScaleFactor: 2 });
+      await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+      await page.evaluate(() => document.fonts.ready);
+      const settled = await page.evaluate(() => Math.ceil(document.getElementById("root")?.scrollHeight || document.body.scrollHeight));
+      if (settled === measured) break;
+      height = Math.max(height, settled);
+    }
+    await page.setViewport({ width: canvasWidth, height, deviceScaleFactor: 2 });
+    await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await page.evaluate(() => document.fonts.ready);
+    const finalHeight = await page.evaluate(() => Math.ceil(document.getElementById("root")?.scrollHeight || document.body.scrollHeight));
+    if (finalHeight > height) throw new Error(`截图内容高度在 4 轮布局后仍未稳定（${height} → ${finalHeight}）`);
+    let screenshotHeight = height;
+    let markerDiagnostics = [];
+    if (markers?.length) {
+      const layout = await applyCaptureMarkers(page, markers);
+      screenshotHeight = layout.screenshotHeight;
+      markerDiagnostics = layout.diagnostics;
+    }
+    await page.screenshot({
+      path: destPath,
+      type: "png",
+      ...(screenshotHeight > height ? {
+        clip: { x: 0, y: 0, width: canvasWidth, height: screenshotHeight },
+        captureBeyondViewport: true,
+      } : {}),
+    });
+    return { markerDiagnostics, screenshotHeight };
   } finally {
     await page.close();
   }
@@ -103,6 +150,11 @@ async function captureAll(buildDir, captures) {
       return fail("PREVIEW_MISSING", `capture ${c.id} 的预览页不存在，先跑 build_publish_pack mode:"previews"`, "capture");
     }
   }
+  const inputHash = captureInputHash(buildDir, captures);
+  const previewManifest = readInputManifest(path.join(buildDir, "previews-manifest.json"));
+  if (previewManifest?.inputHash !== inputHash) {
+    return fail("PREVIEW_STALE", "截图配置或文档快照已变化，先重新运行 build_publish_pack mode:\"previews\"", "capture");
+  }
   const imgDir = path.join(buildDir, "exported-images");
   fs.mkdirSync(imgDir, { recursive: true });
   const snapArts = path.join(buildDir, "snapshot", "artboards");
@@ -117,9 +169,18 @@ async function captureAll(buildDir, captures) {
       const meta = fs.existsSync(metaPath) ? JSON.parse(fs.readFileSync(metaPath, "utf8")) : {};
       const htmlPath = path.join(previewsDir, `${c.id}.html`);
       const destPath = path.join(imgDir, `${c.id}.png`);
-      await captureOne(browser, htmlPath, meta.canvasWidth || 1440, c.actions, destPath);
-      images.push({ captureId: c.id, file: `${c.id}.png` });
+      try {
+        const captured = await captureOne(browser, htmlPath, meta.canvasWidth || 1440, c.actions, c.markers, destPath);
+        images.push({ captureId: c.id, file: `${c.id}.png`, ...captured });
+      } catch (error) {
+        fs.rmSync(imgDir, { recursive: true, force: true });
+        fs.rmSync(path.join(buildDir, "exported-images-manifest.json"), { force: true });
+        return fail("CAPTURE_FAILED", `capture ${c.id}：${error.message}`);
+      }
     }
+    fs.writeFileSync(path.join(buildDir, "exported-images-manifest.json"), JSON.stringify({
+      schemaVersion: 1, inputHash, images: images.map(({ captureId, file }) => ({ captureId, file })),
+    }, null, 2));
     return { ok: true, mode: "capture", browserSource: executable.source, images };
   } finally {
     await browser.close();
@@ -127,6 +188,15 @@ async function captureAll(buildDir, captures) {
 }
 
 function seal(ddir, buildDir, captures, ctx) {
+  const inputHash = captureInputHash(buildDir, captures);
+  const previewManifest = readInputManifest(path.join(buildDir, "previews-manifest.json"));
+  if (previewManifest?.inputHash !== inputHash) {
+    return fail("PREVIEW_STALE", "截图配置或文档快照已变化，先重新运行 build_publish_pack mode:\"previews\"", "capture");
+  }
+  const imageManifest = readInputManifest(path.join(buildDir, "exported-images-manifest.json"));
+  if (imageManifest && imageManifest.inputHash !== inputHash) {
+    return fail("IMAGES_STALE", "自动截图产物与当前配置或快照不一致，请重新运行 capture", "capture");
+  }
   const imgDir = path.join(buildDir, "exported-images");
   const pngs = fs.existsSync(imgDir) ? fs.readdirSync(imgDir).filter((f) => f.endsWith(".png")) : [];
   for (const c of captures) {
@@ -141,7 +211,7 @@ function seal(ddir, buildDir, captures, ctx) {
   for (const c of captures) fs.copyFileSync(path.join(imgDir, `${c.id}.png`), path.join(assetsDir, `${c.id}.png`));
 
   const manifest = {
-    schemaVersion: 1, sealedAt: new Date(ctx.now()).toISOString(),
+    schemaVersion: 2, sealedAt: new Date(ctx.now()).toISOString(), inputHash,
     images: captures.map((c) => ({ captureId: c.id, file: `${c.id}.png`, artboardId: c.artboardId, title: c.title })),
   };
   fs.writeFileSync(path.join(buildDir, "captures-manifest.json"), JSON.stringify(manifest, null, 2));

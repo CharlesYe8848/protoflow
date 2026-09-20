@@ -8,15 +8,15 @@
 import { EXPORT_MENU } from "./exportMenu.js";
 import { buildCanvasExportZip } from "./exportCanvas.js";
 import { buildCanvasExportHtml } from "./exportCanvasHtml.js";
-import { buildDocExportZip } from "./exportDoc.js";
+import { buildDocExportWord } from "./exportDocWord.js";
 import { buildDocExportHtml } from "./exportDocHtml.js";
 import { buildDocExportMarkdown } from "./exportDocMarkdown.js";
 
 const BUILDERS = {
   canvas: { zip: buildCanvasExportZip, html: buildCanvasExportHtml },
-  doc: { zip: buildDocExportZip, html: buildDocExportHtml, markdown: buildDocExportMarkdown },
+  doc: { docx: buildDocExportWord, html: buildDocExportHtml, markdown: buildDocExportMarkdown },
 };
-const MIME = { zip: "application/zip", html: "text/html", markdown: "text/markdown" };
+const MIME = { docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", zip: "application/zip", html: "text/html", markdown: "application/zip" };
 
 export const EXPORT_TARGETS = Object.fromEntries(
   Object.entries(EXPORT_MENU).map(([target, formats]) => [
