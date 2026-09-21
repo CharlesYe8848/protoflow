@@ -153,6 +153,8 @@ html.pf-ann-open .pf-anns{display:block}
 .pf-frame__annotate.is-active{opacity:1;color:var(--pf-brand);background:var(--pf-brand-tint)}
 .pf-frame__box{background:#fff;border:1px solid #e2e8f0;border-radius:4px;box-shadow:0 1px 3px rgba(15,23,42,.06);overflow:hidden}
 .pf-frame__box iframe{display:block;border:0}
+.pf-frame[data-pf-loading] .pf-frame__box{visibility:hidden}
+.pf-frame[data-pf-loading] .pf-frame__label:after{content:"加载中…";font-weight:400;color:#94a3b8}
 .pf-frame__empty{display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px}
 .pf-empty{padding:80px 24px;text-align:center;color:#94a3b8}
 /* ---- 取元素工具（脚本主体见 core/canvasPicker.js，整段随它一起可删） ---- */
@@ -441,6 +443,12 @@ function buildScript({ exportMode = false, singleFile = false } = {}) {
     uiState = Object.assign({ sidebarCollapsed: false, annotationArtboard: null, activePage: null, pages: {} }, loaded || {});
     if (!uiState.pages) uiState.pages = {};
 
+    // 按画板等待首次有效高度，独立于页面的保存视角与首次 fit。
+    // 加载失败时仍露出原始错误/空白页，避免永久遮住画板。
+    document.querySelectorAll('.pf-frame[data-pf-loading]').forEach(function(frame){
+      frame.__pfLoadingTimer = setTimeout(function(){ frame.removeAttribute('data-pf-loading'); }, 10000);
+    });
+
     document.querySelectorAll(".pf-page-canvas").forEach(function(pageEl){
       setupPage(pageEl, uiState.pages[pageEl.getAttribute("data-page")]);
     });
@@ -462,6 +470,7 @@ function buildScript({ exportMode = false, singleFile = false } = {}) {
         var frame = document.querySelector('.pf-frame[data-artboard="' + d.artboardId + '"]');
         var iframe = frame && frame.querySelector("iframe");
         var pageEl2 = frame && frame.closest(".pf-page-canvas");
+        if (!iframe || e.source !== iframe.contentWindow || !Number.isFinite(d.height) || d.height <= 0) return;
         // 页面还 hidden 时收到的高度不能拿来改 iframe.style.height——画板如果用 100vh 这类
         // 视口相对单位布局（很常见的整页 App 截图），它的"真实高度"本来就是照着 iframe 当前
         // 的高度算出来的：这时候把 iframe 压到一个几十像素的假高度，画板会真的按这个假高度重排，
@@ -473,6 +482,8 @@ function buildScript({ exportMode = false, singleFile = false } = {}) {
           // 上限只是兜底（真正打断回环靠 preview.js 的 sizeReportScript 自己识别），万一将来
           // 冒出这套识别逻辑没覆盖到的别的回环模式，也不至于把 iframe 撑到几万像素高把标签页拖垮。
           iframe.style.height = Math.max(80, Math.min(d.height, 20000)) + "px";
+          clearTimeout(frame.__pfLoadingTimer);
+          frame.removeAttribute('data-pf-loading');
         }
         if (pageEl2 && pageEl2.__pfOnSize) pageEl2.__pfOnSize(d.artboardId);
         annOnFrameSettled(d.artboardId);
@@ -1014,9 +1025,9 @@ function buildFrame(pageId, ab, opts = {}) {
   // 建好 Blob URL，把画板 HTML 里的占位路径换成真实 blob: URL，这时候才赋给 iframe.srcdoc（见
   // buildScript）——库源码全文件只留一份，不再跟着每块画板重复一份 react/babel。
   if (opts.singleFile) {
-    return `<div class="pf-frame" data-artboard="${esc(ab.id)}">${label}<div class="pf-frame__box"><iframe style="width:${width}px;height:${placeholderHeight}px"></iframe></div></div>`;
+    return `<div class="pf-frame" data-artboard="${esc(ab.id)}" data-pf-loading>${label}<div class="pf-frame__box"><iframe style="width:${width}px;height:${placeholderHeight}px"></iframe></div></div>`;
   }
-  return `<div class="pf-frame" data-artboard="${esc(ab.id)}">${label}<div class="pf-frame__box"><iframe src="pages/${esc(pageId)}/artboards/${esc(ab.id)}/preview.html" style="width:${width}px;height:${placeholderHeight}px"></iframe></div></div>`;
+  return `<div class="pf-frame" data-artboard="${esc(ab.id)}" data-pf-loading>${label}<div class="pf-frame__box"><iframe src="pages/${esc(pageId)}/artboards/${esc(ab.id)}/preview.html" style="width:${width}px;height:${placeholderHeight}px"></iframe></div></div>`;
 }
 
 function buildPageCanvas(page, index, docs, opts = {}) {

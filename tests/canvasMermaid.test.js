@@ -97,3 +97,42 @@ test('switching to a page with a saved viewport refreshes iframe height without 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('saved viewport keeps each artboard concealed until React mounts and its content height is applied', { timeout: 30000 }, async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-canvas-ready-'));
+  let browser;
+  try {
+    copyPreviewLibs(path.join(dir, 'lib'));
+    const previewDir = path.join(dir, 'pages/pg_mobile/artboards/ab_mobile');
+    fs.mkdirSync(previewDir, { recursive: true });
+    fs.writeFileSync(path.join(previewDir, 'preview.html'), buildPreviewHtml({
+      artboardId: 'ab_mobile', libRelPath: '../../../../lib',
+      source: `function Component(){const [ready,setReady]=React.useState(false);React.useEffect(()=>{window.showContent=()=>setReady(true)},[]);return ready?<div style={{height:900}}>Ready</div>:null}`,
+    }));
+    fs.writeFileSync(path.join(dir, 'canvas.html'), buildCanvasHtml({
+      projectName: 'Delayed mount', docs: [],
+      pages: [{ id: 'pg_mobile', name: 'Mobile', artboards: [{ id: 'ab_mobile', name: 'Mobile', hasSource: true, canvasWidth: 375 }] }],
+      exportBundle: { canvasState: { pages: { pg_mobile: { scale: 0.7, x: 80, y: 40 } } } },
+    }));
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    const page = await browser.newPage();
+    await page.goto(pathToFileURL(path.join(dir, 'canvas.html')).href);
+    const frame = page.frames().find(f => f.url().endsWith('/preview.html'));
+    await frame.waitForFunction(() => window.showContent);
+    await new Promise(resolve => setTimeout(resolve, 350));
+    assert.equal(await page.$eval('iframe', el => getComputedStyle(el).visibility), 'hidden', 'empty-root reports must not expose the placeholder');
+    await page.evaluate(() => {
+      const box = document.querySelector('.pf-frame');
+      new MutationObserver(() => {
+        const iframe = box.querySelector('iframe');
+        if (getComputedStyle(iframe).visibility === 'visible' && !window.firstVisibleHeight) window.firstVisibleHeight = iframe.clientHeight;
+      }).observe(box, { attributes: true, subtree: true });
+    });
+    await frame.evaluate(() => window.showContent());
+    await page.waitForFunction(() => window.firstVisibleHeight);
+    assert.equal(await page.evaluate(() => window.firstVisibleHeight), 900);
+  } finally {
+    if (browser) await browser.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});

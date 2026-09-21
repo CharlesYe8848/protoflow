@@ -383,6 +383,8 @@ const sizeReportScript = (artboardId) => `(function(){
       // 后者至少等于当前 iframe 视口高，占位先按 width×0.72 撑开后就再也缩不回真实内容高度，
       // 画板底下会留下一截白边。发布截图同理（publishPack 也量的是 #root）。
       var root = document.getElementById("root");
+      // React 尚未挂载时，视口占位高度不代表内容就绪。
+      if (!root || !root.hasChildNodes() || root.scrollHeight <= 0) return;
       var h = Math.ceil((root && root.scrollHeight) || document.body.scrollHeight || document.documentElement.scrollHeight);
       parent.postMessage({ type: "protoflow-preview-size", artboardId: ID, height: h }, "*");
     } catch (e) {}
@@ -396,7 +398,12 @@ const sizeReportScript = (artboardId) => `(function(){
     report();
   }
   window.addEventListener("load", function(){ setTimeout(report, 50); setTimeout(report, 300); setTimeout(report, 900); });
-  if (window.ResizeObserver) new ResizeObserver(onResize).observe(document.documentElement);
+  if (window.ResizeObserver) {
+    var observer = new ResizeObserver(onResize);
+    observer.observe(document.documentElement);
+    var contentRoot = document.getElementById("root");
+    if (contentRoot) observer.observe(contentRoot);
+  }
   document.addEventListener("click", function(){ setTimeout(report, 60); });
   // 画布那边：自己所在的页面切页时是"祖先 display:none"，本画板这几次定时上报如果恰好在那时候
   // 触发，量出来的都是没排版的假高度（父文档不知道，会拿假高度定死缩放）。父文档把页面切成可见
