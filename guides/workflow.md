@@ -15,8 +15,8 @@ HTML、Figma 或 React 仓库。项目尚未创建时不调用 `chain_status`。
 
 | 场景 | 按需读取 | 操作与完成标准 |
 | --- | --- | --- |
-| 新建可点击原型 | `artboard`；画板需要流程/时序图再读 `diagram` | 明确关键任务与必要状态 → `create_project` → `upsert_page` / `upsert_artboard` → `save_artboard_source` → `render_canvas`。验证所需交互并返回预览；未要求标注或文档则到此结束。 |
-| 修改已有原型 | `artboard` | 读取目标源码 → `chain_status` 了解既有问题 → 修改并 `save_artboard_source` → 验证受影响交互 → 再检查链路。保留结构和稳定元素 ID；下游过期按本次范围处理或报告。 |
+| 新建可点击原型 | `artboard`；画板需要流程/时序图再读 `diagram` | 明确关键任务与必要状态 → `create_project` → `upsert_page` / `upsert_artboard` → `save_artboard_source` → `render_canvas`。检查所需交互逻辑并返回预览；未要求标注或文档则到此结束。 |
+| 修改已有原型 | `artboard` | 读取目标源码 → `chain_status` 了解既有问题 → 修改并 `save_artboard_source` → 检查受影响交互逻辑 → 再检查链路。保留结构和稳定元素 ID；下游过期按本次范围处理或报告。 |
 | 补充或核对元素标注 | `annotation` | `get_annotations` 与目标源码 → 核对规则和实际状态 → `write_annotations` → `chain_status`。引用必须有效，交互后出现的元素按需提供 refs；不自动生成 PRD。 |
 | 从原型交付或更新文档 | `doc-writing`；需要新截图再读 `capture` | 按下节文档路径执行。交付要求的正文、图片和版本；不自动发布。 |
 | 检查变更影响 | 无需额外写作指南 | `chain_status` → 解释受影响对象、原因、建议动作。只检查时到此结束，不修改源文件、不定版。请求修复时再进入对应路径。 |
@@ -57,7 +57,7 @@ HTML、Figma 或 React 仓库。项目尚未创建时不调用 `chain_status`。
 
 ## 持久化与完成边界
 
-- 原型交互按 `artboard` 指南验收：在浏览器走通本次关键任务或受影响路径并核对结果，交付时简述已验证与未验证的路径。
+- 原型按 `artboard` 指南做轻量检查后交付预览；浏览器验收按需触发，不作为日常设计的固定步骤。
 - 项目文件是事实来源，沿用 `project.json`、源码、标注和 `doc.json`，不另建进度状态。
 - 原型预览是源文件实时投影，刷新即最新；文档阅读页来自 finalize 版本，草稿修改不会自动更新它。
 - `versions/<n>/` 是不可变历史；指纹、head 等派生字段由工具维护，不手改。
