@@ -153,8 +153,13 @@ html.pf-ann-open .pf-anns{display:block}
 .pf-frame__annotate.is-active{opacity:1;color:var(--pf-brand);background:var(--pf-brand-tint)}
 .pf-frame__box{background:#fff;border:1px solid #e2e8f0;border-radius:4px;box-shadow:0 1px 3px rgba(15,23,42,.06);overflow:hidden}
 .pf-frame__box iframe{display:block;border:0}
-.pf-frame[data-pf-loading] .pf-frame__box{visibility:hidden}
-.pf-frame[data-pf-loading] .pf-frame__label:after{content:"加载中…";font-weight:400;color:#94a3b8}
+.pf-frame[data-pf-loading] .pf-frame__box{position:relative;background:#fff;border-color:transparent;box-shadow:none}
+.pf-frame[data-pf-loading] iframe{visibility:hidden}
+.pf-frame[data-pf-loading] .pf-frame__box:before,.pf-frame[data-pf-loading] .pf-frame__box:after{content:"";position:absolute;inset:0;pointer-events:none;background-image:radial-gradient(circle,#94a3b8 1px,transparent 1.2px);background-size:7px 7px}
+.pf-frame[data-pf-loading] .pf-frame__box:before{opacity:.2;mask-image:radial-gradient(ellipse at center,#000 15%,transparent 75%)}
+.pf-frame[data-pf-loading] .pf-frame__box:after{opacity:.55;mask-image:radial-gradient(ellipse 38% 32% at center,#000,transparent);animation:pf-placeholder-breathe 2.4s ease-in-out infinite}
+@keyframes pf-placeholder-breathe{0%,100%{opacity:.25;transform:translateX(-3%)}50%{opacity:.65;transform:translateX(3%)}}
+@media(prefers-reduced-motion:reduce){.pf-frame[data-pf-loading] .pf-frame__box:after{animation:none}}
 .pf-frame__empty{display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:13px}
 .pf-empty{padding:80px 24px;text-align:center;color:#94a3b8}
 /* ---- 取元素工具（脚本主体见 core/canvasPicker.js，整段随它一起可删） ---- */
