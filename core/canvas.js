@@ -520,6 +520,11 @@ function buildScript({ exportMode = false, singleFile = false } = {}) {
         // 注释），请求画板最新尺寸，启动那套「等真实高度再 fit()」的流程。已经 fit
         // 过的页面这里是空操作（__pfEnsureFit 内部会自己判断），不会打断用户已经手动调整过的视角。
         if (show && p.__pfEnsureFit) p.__pfEnsureFit();
+        // 高度同步独立于首次 fit：已有保存视角/已经 fit 的页面也可能错过隐藏期间的尺寸上报。
+        // 只重新测量，不重载 iframe、不重置用户缩放或交互状态。
+        if (show) p.querySelectorAll(".pf-frame__box iframe").forEach(function(f){
+          try { f.contentWindow.postMessage({ type: "protoflow-request-size" }, "*"); } catch (e) {}
+        });
       });
       annReflect(id);
     }
