@@ -36,7 +36,7 @@ export function resolveAuthor(env = process.env) {
 
 export function buildInstructions() {
   return [
-    "UI 画板默认交付可运行的交互原型，让用户完成本次范围内的关键任务；编写或修改画板前读取 artboard 指南。明确要求静态稿、流程图或仅调整视觉时，按该范围交付。",
+    "画板支持静态展示与 React 状态交互。根据本次目的自主选择静态、交互或混合表达，遵循用户明确要求，不强制所有控件可交互或补齐完整业务流程；编写或修改画板前读取 artboard 指南。",
     "ProtoFlow：创建和修改可点击的产品原型、元素标注，以及基于原型交付带截图的 PRD 和上线说明。已有项目沿用原结构；纯需求讨论或生产应用开发不自动创建项目。",
     "chain_status 只读计算变更影响，不更新校验基线；修改后检查，只检查时不自动修复或发布。",
     "你负责写内容（JSX/标注/captures.json/PRD.md），工具负责校验、登记、构建、组包。",

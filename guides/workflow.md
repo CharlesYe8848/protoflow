@@ -15,7 +15,7 @@ HTML、Figma 或 React 仓库。项目尚未创建时不调用 `chain_status`。
 
 | 场景 | 按需读取 | 操作与完成标准 |
 | --- | --- | --- |
-| 新建可点击原型 | `artboard`；画板需要流程/时序图再读 `diagram` | 明确关键任务与必要状态 → `create_project` → `upsert_page` / `upsert_artboard` → `save_artboard_source` → `render_canvas`。检查所需交互逻辑并返回预览；未要求标注或文档则到此结束。 |
+| 新建原型 | `artboard`；画板需要流程/时序图再读 `diagram` | 根据本次目的选择静态、交互或混合表达 → `create_project` → `upsert_page` / `upsert_artboard` → `save_artboard_source` → `render_canvas`。检查所选表达及已实现的交互逻辑并返回预览；未要求标注或文档则到此结束。 |
 | 修改已有原型 | `artboard` | 读取目标源码 → `chain_status` 了解既有问题 → 修改并 `save_artboard_source` → 检查受影响交互逻辑 → 再检查链路。保留结构和稳定元素 ID；下游过期按本次范围处理或报告。 |
 | 补充或核对元素标注 | `annotation` | `get_annotations` 与目标源码 → 核对规则和实际状态 → `write_annotations` → `chain_status`。引用必须有效，交互后出现的元素按需提供 refs；不自动生成 PRD。 |
 | 从原型交付或更新文档 | `doc-writing`；需要新截图再读 `capture` | 按下节文档路径执行。交付要求的正文、图片和版本；不自动发布。 |
