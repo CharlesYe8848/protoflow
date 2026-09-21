@@ -91,7 +91,8 @@ html.pf-ann-open .pf-anns{display:block}
 .pf-anns__empty{padding:12px 10px;font-size:11px;color:#94a3b8;line-height:1.6}
 .pf-main{flex:1;position:relative;overflow:hidden}
 .pf-page-canvas{position:absolute;inset:0;display:flex;flex-direction:column}
-.pf-page-canvas[hidden]{display:none}
+/* 隐藏页面保留布局：iframe 内的 Mermaid/SVG 仍需测量尺寸，否则时序图会报 svg element not in render tree。 */
+.pf-page-canvas[hidden]{display:flex;visibility:hidden;pointer-events:none}
 .pf-toolbar{position:absolute;left:16px;bottom:16px;z-index:5;background:#fff;border:1px solid #e2e8f0;border-radius:10px;box-shadow:0 4px 16px rgba(15,23,42,.08);padding:4px}
 .pf-zoom-label{min-width:44px;height:28px;padding:0 8px;border:none;background:none;border-radius:6px;font-size:12px;color:#334155;cursor:pointer;font-family:inherit}
 .pf-zoom-label:hover{background:#f1f5f9}
@@ -399,16 +400,9 @@ function buildScript({ exportMode = false, singleFile = false } = {}) {
     // core/preview.js 的 sizeReportScript）再 fit()+显示，避免"先按占位高度画一帧，稍后又跳到
     // 正确缩放"的闪烁；算出来之后顺手存一份，下次打开就有存量视角了，不用再等这一趟。
     //
-    // 「点开另一个页面只显示一部分，刷新才正常」这个 bug 的根子在这：boot() 一开始除了当前选中那
-    // 页，其它页面的 .pf-page-canvas 都还带着 hidden（display:none）——祖先不可见时浏览器根本
-    // 不会给里面的 iframe 排版，这时候量出来的高度全是 0/占位值。如果这里的等待流程在页面还
-    // hidden 的时候就跑完了（画板一上报——哪怕报的是 0——pendingCount 照样归零），fit() 就会
-    // 拿着这些假高度算出一次缩放，之后即便画板真的可见后修正了 iframe.style.height，这次
-    // fit() 也不会重算——用户切过去看到的就是按小高度缩放定好的画面，下半截露不出来。
-    // 所以这套等待流程只在页面真的可见时才启动；还 hidden 就先不启动，交给下面
-    // pageEl.__pfEnsureFit（由 switchToPage 在真正切出这页时调用）去启动——启动时画板已经在
-    // 可见状态排过版，且会主动 postMessage 让画板马上重新量一次再报一遍（不能干等它自己的定时
-    // 上报，那几次在还 hidden 时就已经报完、报的还是假数据，不会再报第二轮）。
+    // 首次 fit 仍在选中页面时启动，避免把画板尚未渲染完成的占位高度持久化。
+    // hidden 页面用 visibility:hidden 保留布局，供 Mermaid/SVG 在后台测量；切出时再通过
+    // __pfEnsureFit 请求最新尺寸，不依赖后台已经结束的定时上报，也不重载画板。
     var pendingIds = null, pendingCount = 0, revealed = false, waiting = false;
     function revealOnce(){
       if (revealed) return;
@@ -523,7 +517,7 @@ function buildScript({ exportMode = false, singleFile = false } = {}) {
         var show = p.getAttribute("data-page") === id;
         p.hidden = !show;
         // 页面从 hidden 切到可见：如果它还没走完首次 fit()（见 setupPage 里 __pfEnsureFit 的
-        // 注释），这时候画板才第一次真正被排版，启动那套「等真实高度再 fit()」的流程。已经 fit
+        // 注释），请求画板最新尺寸，启动那套「等真实高度再 fit()」的流程。已经 fit
         // 过的页面这里是空操作（__pfEnsureFit 内部会自己判断），不会打断用户已经手动调整过的视角。
         if (show && p.__pfEnsureFit) p.__pfEnsureFit();
       });
