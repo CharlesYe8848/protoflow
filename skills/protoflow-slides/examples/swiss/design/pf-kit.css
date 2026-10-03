@@ -1,0 +1,74 @@
+/* pf-kit.css — 幻灯片可选工具库的样式（配 pf-kit.js，要用就一起拷进幻灯片的 design/，放在自己的样式前面）。只放"能力"：
+   变量默认值（自己的样式覆盖）、图标、图表、截图外框、流程图容器、动效关键帧和几个通用动效钩子。用法见 references/kit.md。 */
+:where(:root){
+  /* 变量：图标、图表、外框读这些；在自己的样式里用 :root 覆盖成这份幻灯片的配色（:where 优先级为 0，跟文件先后无关） */
+  --paper:#ffffff; --ink:#0f172a; --muted:#64748b; --line:#e2e8f0; --accent:#2f54eb; --accent-ink:#ffffff;
+  --font:"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif; --font-display:var(--font);
+  --ink-2:#334155; --faint:#94a3b8; --tint:#f1f5f9; --accent-tint:#eef2ff; --dark:#0f172a;
+  --mono:"SF Mono",Menlo,Consolas,monospace;
+  --r-sm:16px;
+  /* 图表（runtime.js 读）：次要数据的颜色、柱子圆角、数字字重 */
+  --chart-soft:#cbd5e1; --chart-radius:6; --chart-weight:700;
+}
+section *{box-sizing:border-box}
+
+/* ---- 图标：跟文字同色、跟字一样大 ---- */
+section [data-icon]{display:inline-flex;width:1em;height:1em;vertical-align:-.12em}
+section [data-icon] svg{width:100%;height:100%}
+
+/* ---- 图表容器：大小由版式给，runtime.js 按实际大小画 ---- */
+section .chart{position:relative;width:100%;height:100%;min-height:240px}
+section .chart svg{display:block;width:100%;height:100%}
+section [data-count]{font-variant-numeric:tabular-nums}
+
+/* ---- 流程图（Mermaid）：放开它写死的 max-width，按容器等比放大 ---- */
+section .mermaid{display:flex;justify-content:center;align-items:center;width:100%;height:100%;min-height:0}
+section .mermaid svg{max-width:100%!important;width:100%;height:100%;max-height:100%}
+
+/* ---- 截图外框：截图放进手机 / 浏览器外框里，比裸图有场景感 ---- */
+section .frame-phone{position:relative;display:flex;flex-direction:column;height:100%;max-height:880px;aspect-ratio:9/19.5;margin:auto;padding:18px;border-radius:64px;background:var(--dark);box-shadow:0 0 0 3px var(--line)}
+section .frame-phone>img{flex:1;min-height:0;width:100%;height:100%;max-height:none;object-fit:cover;object-position:top;border-radius:48px;background:var(--paper)}
+section .frame-browser{position:relative;display:flex;flex-direction:column;width:100%;max-height:100%;aspect-ratio:16/10;margin:auto;border-radius:var(--r-sm);overflow:hidden;background:var(--paper);box-shadow:0 0 0 2px var(--line)}
+section .frame-browser::before{content:"";flex:none;height:48px;background:var(--tint) radial-gradient(circle,#f87171 7px,transparent 8px) 20px 50%/28px 48px no-repeat,
+  var(--tint) radial-gradient(circle,#fbbf24 7px,transparent 8px) 48px 50%/28px 48px no-repeat;border-bottom:2px solid var(--line)}
+section .frame-browser>img{flex:1;min-height:0;width:100%;max-height:none;object-fit:cover;object-position:top}
+
+/* ---- 动效：翻到这一页时播放（.pf-slide.active），每次翻回来重播。导出 PDF、检查、总览、系统"减少动态效果"时全部不动 ----
+   关键帧给设计语言复用：animation: pf-rise .55s var(--ease) both */
+@keyframes pf-rise{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+@keyframes pf-fade{from{opacity:0}to{opacity:1}}
+@keyframes pf-zoom{from{opacity:0;transform:scale(.92)}to{opacity:1;transform:none}}
+@keyframes pf-grow-y{from{transform:scaleY(0)}to{transform:none}}
+@keyframes pf-grow-x{from{transform:scaleX(0)}to{transform:none}}
+@keyframes pf-drop{from{opacity:0;transform:scaleY(.2)}to{opacity:1;transform:none}}
+@keyframes pf-draw{from{stroke-dashoffset:1}to{stroke-dashoffset:0}}
+@keyframes pf-pop{0%{opacity:0;transform:scale(0)}70%{opacity:1;transform:scale(1.25)}100%{transform:none}}
+@keyframes pf-sweep{from{stroke-dashoffset:var(--len)}to{stroke-dashoffset:0}}
+@keyframes pf-deco{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:none}}
+@keyframes pf-nudge{0%,100%{transform:none}50%{transform:translateY(-10px)}}
+.pf-slide.active{--ease:cubic-bezier(.2,.7,.2,1)}
+/* 通用钩子：data-anim="rise|fade|zoom" 让一个元素进场；data-stagger 让它的子元素一个一个出来（可配合 data-anim 换效果） */
+.pf-slide.active section [data-anim]{animation:pf-rise .55s var(--ease) both;animation-delay:var(--d,.1s)}
+.pf-slide.active section [data-anim="fade"]{animation-name:pf-fade}
+.pf-slide.active section [data-anim="zoom"]{animation-name:pf-zoom}
+.pf-slide.active section [data-stagger]>*{animation:pf-rise .5s var(--ease) both;animation-delay:var(--d,.2s)}
+.pf-slide.active section [data-stagger="fade"]>*{animation-name:pf-fade}
+.pf-slide.active section [data-stagger="zoom"]>*{animation-name:pf-zoom}
+.pf-slide.active section [data-stagger]>:nth-child(1){--d:.2s}
+.pf-slide.active section [data-stagger]>:nth-child(2){--d:.32s}
+.pf-slide.active section [data-stagger]>:nth-child(3){--d:.44s}
+.pf-slide.active section [data-stagger]>:nth-child(4){--d:.56s}
+.pf-slide.active section [data-stagger]>:nth-child(5){--d:.68s}
+.pf-slide.active section [data-stagger]>:nth-child(n+6){--d:.8s}
+/* 图表（runtime.js 打的标记）：柱子长高、条形伸长、漏斗逐级展开、折线画出、环形转一圈，数字最后淡入 */
+.pf-slide.active .chart .pf-a-y{transform-box:fill-box;transform-origin:50% 100%;animation:pf-grow-y .7s var(--ease) both;animation-delay:calc(.25s + var(--i) * .06s)}
+.pf-slide.active .chart .pf-a-x{transform-box:fill-box;transform-origin:0 50%;animation:pf-grow-x .7s var(--ease) both;animation-delay:calc(.25s + var(--i) * .08s)}
+.pf-slide.active .chart .pf-a-drop{transform-box:fill-box;transform-origin:50% 0;animation:pf-drop .45s var(--ease) both;animation-delay:calc(.2s + var(--i) * .16s)}
+.pf-slide.active .chart .pf-a-draw{stroke-dasharray:1;animation:pf-draw 1.1s ease-out both;animation-delay:.25s}
+.pf-slide.active .chart .pf-a-pop{transform-box:fill-box;transform-origin:center;animation:pf-pop .4s var(--ease) both;animation-delay:1.1s}
+.pf-slide.active .chart .pf-a-sweep{animation:pf-sweep 1s var(--ease) both;animation-delay:.3s}
+.pf-slide.active .chart .pf-a-fade{animation:pf-fade .4s ease-out both;animation-delay:calc(.75s + var(--i) * .02s)}
+/* 不动的场合 */
+@media (prefers-reduced-motion:reduce){.pf-slide *,.pf-slide *::before,.pf-slide *::after{animation:none!important}}
+html.pf-print .pf-slide *,html.pf-print .pf-slide *::before,html.pf-print .pf-slide *::after,
+html.pf-overview .pf-slide *,html.pf-overview .pf-slide *::before,html.pf-overview .pf-slide *::after{animation:none!important}

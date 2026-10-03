@@ -4,40 +4,42 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import * as store from "../core/store.js";
-import { buildDoc, createDoc } from "../core/doc.js";
-import { buildPublishPack } from "../core/publishPack.js";
-import { buildDocExportZip } from "../core/exportDoc.js";
-import { runProjectExport } from "../core/exportService.js";
+import * as canvasStore from "../products/canvas/store.js";
+import * as docStore from "../products/doc/store.js";
+import { buildDoc, createDoc } from "../products/doc/doc.js";
+import { buildCanvas } from "../products/canvas/canvasVersion.js";
+import { buildDocExportZip } from "../products/doc/exportDoc.js";
+import { runProjectExport } from "../products/index.js";
 import { readZipEntries } from "../core/zip.js";
+import { tpl } from "./helpers/productDevTemplate.js";
 
 const CTX = { now: () => 1700000000000, genId: (p) => `${p}_1`, author: "Charles" };
 
 function setup() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "pf-exp-"));
   const proj = store.createProject(ws, "招聘", CTX);
-  const pg = store.upsertPage(ws, proj.id, { name: "流程" }, CTX);
-  const ab = store.upsertArtboard(ws, proj.id, pg.id, { name: "列表页" }, CTX);
-  store.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <div id="l">列表</div>; }`);
+  const pg = canvasStore.upsertPage(ws, proj.id, { name: "流程" }, CTX);
+  const ab = canvasStore.upsertArtboard(ws, proj.id, pg.id, { name: "列表页" }, CTX);
+  canvasStore.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <div id="l">列表</div>; }`);
   return { ws, proj, ab };
 }
-const ddir = (ws, pid, docId = "prd") => store.docDir(ws, pid, docId);
+const ddir = (ws, pid, docId = "prd") => docStore.docDir(ws, pid, docId);
 function writeMd(ws, pid, md, docId = "prd") {
   fs.writeFileSync(path.join(ddir(ws, pid, docId), "doc.md"), md);
 }
-async function sealOneCapture(ws, pid, ab, docId = "prd") {
-  const d = path.join(ddir(ws, pid, docId), ".build");
-  fs.mkdirSync(d, { recursive: true });
-  fs.writeFileSync(path.join(d, "captures.json"), JSON.stringify({ captures: [{ id: "cap-a", artboardId: ab.id, title: "A", annotationIds: [] }] }));
-  await buildDoc(ws, pid, docId, "snapshot", {}, CTX);
-  await buildPublishPack(ws, pid, docId, "previews", CTX);
-  fs.writeFileSync(path.join(d, "exported-images", "cap-a.png"), "PNGBYTES");
-  await buildPublishPack(ws, pid, docId, "seal", CTX);
+// 截图脚本的产物（skills/protoflow-product-dev/scripts/capture.mjs）：画布先定一版，assets/ 里放图片和出处文件。
+function placeCapture(ws, pid, ab, docId = "prd", bytes = "PNGBYTES") {
+  if (!canvasStore.canvasHead(ws, pid, "main")) buildCanvas(ws, pid, { note: "v1" }, CTX);
+  const a = path.join(ddir(ws, pid, docId), "assets");
+  fs.mkdirSync(a, { recursive: true });
+  fs.writeFileSync(path.join(a, "cap-a.png"), bytes);
+  fs.writeFileSync(path.join(a, "cap-a.png.source.json"), JSON.stringify({ ref: `canvas:main@${canvasStore.canvasHead(ws, pid, "main")}#${ab.id}` }));
 }
 
 test("exportDoc：不落盘到项目目录——只回 { filename, buffer }，只带当前（head）版本，不带历史版本/版本切换", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "结账 PRD" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "结账 PRD" }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(ws, proj.id, "# 结账 PRD\n\n<!-- protoflow:changelog -->\n\n正文\n\n![截图](assets/cap-a.png)\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
   writeMd(ws, proj.id, "# 结账 PRD\n\n<!-- protoflow:changelog -->\n\n正文改改\n\n![截图](assets/cap-a.png)\n");
@@ -59,7 +61,7 @@ test("exportDoc：不落盘到项目目录——只回 { filename, buffer }，�
   assert.ok(byName["结账 PRD/assets/cap-a.png"], "图片是 zip 里的真实文件");
   assert.ok(!h.includes('class="pf-hdr-home"') && !h.includes("返回画布"), "去掉「返回画布」");
   assert.ok(!h.includes('class="pf-hdr-share"'), "导出目录里不放「导出」按钮");
-  assert.ok(h.includes("var __PF_SIBLINGS__ = [];"), "没有同项目其它文档的跳转");
+  assert.ok(!h.includes("__PF_SIBLINGS__") && !h.includes("__PF_PNAV__"), "没有同项目其它产物的跳转——项目侧边栏只由本地服务注入，导出产物里不带");
   const vArr = JSON.parse(h.match(/var __PF_VERSIONS__ = (\[[\s\S]*?\]);\n/)[1]);
   assert.deepEqual(vArr.map((v) => v.n), [2], "只带 head 这一版，不带历史版本 v1");
   assert.equal(JSON.parse(h.match(/var __PF_HEAD__ = (\d+);/)[1]), 2);
@@ -67,8 +69,8 @@ test("exportDoc：不落盘到项目目录——只回 { filename, buffer }，�
 
 test("exportDoc：head 版本用到 mermaid 时引 lib/mermaid.min.js（真实文件），不用则不拷", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd") }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(ws, proj.id, "# t\n\n```mermaid\nflowchart TD\n A-->B\n```\n\n![x](assets/cap-a.png)\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
   const withM = buildDocExportZip(ws, proj.id, "prd");
@@ -78,8 +80,8 @@ test("exportDoc：head 版本用到 mermaid 时引 lib/mermaid.min.js（真实�
   assert.ok(byNameM["t/lib/mermaid.min.js"]);
 
   const { ws: ws2, proj: p2, ab: ab2 } = setup();
-  createDoc(ws2, p2.id, { kind: "prd" }, CTX);
-  await sealOneCapture(ws2, p2.id, ab2);
+  createDoc(ws2, p2.id, { docId: "prd", ...tpl("prd") }, CTX);
+  await placeCapture(ws2, p2.id, ab2);
   writeMd(ws2, p2.id, "# t\n\n无图\n\n![x](assets/cap-a.png)\n");
   await buildDoc(ws2, p2.id, "prd", "finalize", { note: "首版" }, CTX);
   const noM = buildDocExportZip(ws2, p2.id, "prd");
@@ -91,8 +93,8 @@ test("exportDoc：head 版本用到 mermaid 时引 lib/mermaid.min.js（真实�
 
 test("exportDoc：只导当前版本——finalize 到 v2 后再导出，不含 v1 的改动痕迹", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd") }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(ws, proj.id, "# t\n\n<!-- protoflow:changelog -->\n\n v1 正文\n\n![x](assets/cap-a.png)\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "v1 备注" }, CTX);
   writeMd(ws, proj.id, "# t\n\n<!-- protoflow:changelog -->\n\n v2 正文\n\n![x](assets/cap-a.png)\n");
@@ -106,8 +108,8 @@ test("exportDoc：只导当前版本——finalize 到 v2 后再导出，不含 
 
 test("exportDoc：runProjectExport('doc/<id>/zip') 走这条路由，返回 { filename, buffer, mime }", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "结账 PRD" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "结账 PRD" }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(ws, proj.id, "# 结账 PRD\n\n正文\n\n![x](assets/cap-a.png)\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
 
@@ -127,6 +129,6 @@ test("exportDoc：runProjectExport('doc/<id>/zip') 走这条路由，返回 { fi
 
 test("exportDoc：文档无版本 → null", () => {
   const { ws, proj } = setup();
-  createDoc(ws, proj.id, { kind: "prd" }, CTX);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd") }, CTX);
   assert.equal(buildDocExportZip(ws, proj.id, "prd"), null);
 });

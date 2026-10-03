@@ -1,9 +1,9 @@
-// core/exportUtil.js — 导出相关小工具，给 exportCanvas.js / exportDoc.js / exportCanvasHtml.js /
-// exportDocHtml.js 四个 build 函数共用，不用各自重复写一遍。
+// core/exportUtil.js — 各产品导出共用的小工具（框架）：文件名、把版本里的 assets/ 拷出来或内联。
+// 只跟某一个产品有关的（比如文档取 head 版本、修改记录表）放在那个产品自己的目录里。
 import fs from "node:fs";
 import path from "node:path";
-import { readDocJson, docVersionDir } from "./store.js";
-import { usesMermaidDoc } from "./docPreview.js";
+import { assetsDataMap } from "./ui.js";
+import { isSourceSidecar } from "./refs.js";
 
 // 文件名 = 项目名/文档标题，去掉文件系统不友好的字符；空则回退 fallback（通常是 id）。
 export function safeFileName(name, fallback) {
@@ -11,14 +11,17 @@ export function safeFileName(name, fallback) {
   return (s || fallback).slice(0, 120);
 }
 
-// 文档导出（zip、单 HTML 都要）共用的第一步：只认 head 版本，取它的 md/目录/是否用了 mermaid。
-// 返回 null（文档没有任何版本，调用方直接回 null 表示"这个导出目标不存在"）。
-export function loadDocHead(ws, projectId, docId) {
-  const dj = readDocJson(ws, projectId, docId);
-  if (!dj || !(dj.versions || []).length) return null;
-  const head = dj.head;
-  const v = dj.versions.find((x) => x.n === head) || dj.versions[dj.versions.length - 1];
-  const vDir = docVersionDir(ws, projectId, docId, v.n);
-  const md = fs.readFileSync(path.join(vDir, "doc.md"), "utf8");
-  return { dj, v, vDir, md, anyMermaid: usesMermaidDoc(md), name: safeFileName(dj.title || docId, docId) };
+// 把版本里 assets/ 下的文件原样写到 destDir（zip / markdown 导出用）。没有图片就什么也不建。
+// 素材的出处文件（.source.json，给引用用的，见 core/refs.js）不导出。
+export function copyVersionAssets(version, destDir) {
+  for (const rel of version.list("assets").filter((r) => !isSourceSidecar(r))) {
+    const target = path.join(destDir, ...rel.split("/"));
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    fs.copyFileSync(version.filePath(rel), target);
+  }
+}
+
+// 版本里 assets/ 下图片的 { 文件名: data URI }（单 HTML 导出内联用）。
+export function versionAssetsDataMap(version) {
+  return assetsDataMap(version.list("assets").map((rel) => ({ name: rel.slice("assets/".length), filePath: version.filePath(rel) })));
 }

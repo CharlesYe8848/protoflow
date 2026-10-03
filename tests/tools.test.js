@@ -4,12 +4,13 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { fileURLToPath } from "node:url";
-import { TOOL_REGISTRY, TOOL_MAP } from "../mcp/tools.js";
+import { TOOL_REGISTRY, TOOL_MAP, guideFiles } from "../cli/tools.js";
+import { tpl } from "./helpers/productDevTemplate.js";
 
-// 不碰开发者真实 ~/.protoflow/：本文件里所有会触发 render_preview/render_canvas/build_prd/
+// 不碰开发者真实 ~/.protoflow/：本文件里所有会触发 render_canvas/build_prd/
 // build_publish_pack 的用例都会经过 core/localServer.js 起后台静态文件服务，统一用一个临时
 // 状态文件隔离，测试结束把 spawn 出来的后台进程 kill 掉。
-process.env.PROTOFLOW_SERVER_STATUS = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pf-mcp-srv-")), "server.json");
+process.env.PROTOFLOW_SERVER_STATUS = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pf-cli-srv-")), "server.json");
 after(() => {
   try { process.kill(JSON.parse(fs.readFileSync(process.env.PROTOFLOW_SERVER_STATUS, "utf8")).pid); } catch {}
 });
@@ -17,13 +18,14 @@ after(() => {
 const guidesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "guides");
 let seq = 0;
 function ctx() {
-  return { ws: fs.mkdtempSync(path.join(os.tmpdir(), "pf-mcp-")), now: () => 1700000000000 + (++seq), genId: (p) => `${p}_g${++seq}`, guidesDir, author: "T" };
+  return { ws: fs.mkdtempSync(path.join(os.tmpdir(), "pf-cli-")), now: () => 1700000000000 + (++seq), genId: (p) => `${p}_g${++seq}`, guidesDir, author: "T" };
 }
 const call = (name, args, c) => TOOL_MAP[name].handler(args, c);
 
-test("注册表：22 个工具，名称唯一，均有 description/schema/handler", () => {
-  assert.equal(TOOL_REGISTRY.length, 22);
-  assert.equal(new Set(TOOL_REGISTRY.map((t) => t.name)).size, 22);
+test("注册表：30 个工具，名称唯一，均有 description/schema/handler", () => {
+  assert.equal(TOOL_REGISTRY.length, 30);
+  for (const gone of ["chain_status", "render_preview", "get_skill", "import_project"]) assert.equal(TOOL_MAP[gone], undefined, `${gone} 已合并或去掉`);
+  assert.equal(new Set(TOOL_REGISTRY.map((t) => t.name)).size, 30);
   for (const t of TOOL_REGISTRY) {
     assert.ok(t.description.length > 10, t.name);
     assert.ok(t.schema && typeof t.handler === "function", t.name);
@@ -42,7 +44,7 @@ test("端到端：建项目→画板→保存→标注→chain 全绿", async ()
   assert.deepEqual(ann.elementIds, ["btn"]);
   const applied = await call("write_annotations", { projectId: proj.id, artboardId: ab.id, md: "## 说明\n\n点 [按钮](#el/btn)" }, c);
   assert.equal(applied.ok, true);
-  const status = await call("chain_status", { projectId: proj.id }, c);
+  const status = await call("get_project", { projectId: proj.id, findings: true }, c);
   assert.deepEqual(status.findings, []);
   const gp = await call("get_project", { projectId: proj.id }, c);
   assert.equal(gp.findingCount, 0);
@@ -68,7 +70,7 @@ test("save_artboard_source：编译失败不落盘；edits 补丁模式；非唯
   assert.equal(dup.error.code, "EDIT_AMBIGUOUS");
 });
 
-test("render_preview / render_canvas：校验入参后返回可用的实时画布 URL，不落盘", async () => {
+test("render_canvas：校验入参后返回可用的实时画布 URL，不落盘；传 artboardId 先校验画板有源码", async () => {
   const c = ctx();
   const proj = await call("create_project", { name: "员工档案" }, c);
 
@@ -80,18 +82,18 @@ test("render_preview / render_canvas：校验入参后返回可用的实时画�
   await call("upsert_page", { projectId: proj.id, name: "详情" }, c);
   const ab = await call("upsert_artboard", { projectId: proj.id, pageId: pgList.id, name: "员工列表页", canvasWidth: 1920 }, c);
 
-  const noSrc = await call("render_preview", { projectId: proj.id, artboardId: ab.id }, c);
+  const noSrc = await call("render_canvas", { projectId: proj.id, artboardId: ab.id }, c);
   assert.equal(noSrc.ok, false);
   assert.equal(noSrc.error.code, "NO_SOURCE");
   await call("save_artboard_source", { projectId: proj.id, artboardId: ab.id, source: `function Component(){ return <div id="x">列表</div>; }` }, c);
 
-  const rp = await call("render_preview", { projectId: proj.id, artboardId: ab.id }, c);
+  const rp = await call("render_canvas", { projectId: proj.id, artboardId: ab.id }, c);
   const rc = await call("render_canvas", { projectId: proj.id }, c);
   assert.equal(rp.ok, true);
   assert.equal(rc.ok, true);
   assert.equal(rc.pageCount, 2);
-  // 两个工具都返回整站画布的 http://127.0.0.1 url（render_preview 不给画板级单独地址）
-  assert.match(rp.url, /^http:\/\/127\.0\.0\.1:\d+\/p\/[^/]+\/canvas\.html$/);
+  // 传不传 artboardId 都返回整站画布的 http://127.0.0.1 url（不给画板级单独地址）
+  assert.match(rp.url, /^http:\/\/127\.0\.0\.1:\d+\/p\/[^/]+\/canvases\/main\/canvas\.html$/);
   assert.equal(rc.url, rp.url);
   // 不再有落盘产物 / 落盘路径字段
   assert.equal("htmlPath" in rp, false);
@@ -158,19 +160,17 @@ async function fullDoc(c, { md, docId = "prd", kind = "prd" } = {}) {
   const ab = await call("upsert_artboard", { projectId: proj.id, pageId: pg.id, name: "板" }, c);
   await call("save_artboard_source", { projectId: proj.id, artboardId: ab.id, source: `function Component(){ return <div id="a">x</div>; }` }, c);
   await call("create_doc", { projectId: proj.id, kind, docId }, c);
-  const bdir = path.join(c.ws, proj.id, "docs", docId, ".build");
-  fs.mkdirSync(bdir, { recursive: true });
-  fs.writeFileSync(path.join(bdir, "captures.json"), JSON.stringify({ captures: [{ id: "cap-a", artboardId: ab.id, title: "A", annotationIds: [] }] }));
-  await call("build_doc", { projectId: proj.id, docId, mode: "snapshot" }, c);
-  await call("build_publish_pack", { projectId: proj.id, docId, mode: "previews" }, c);
-  fs.writeFileSync(path.join(bdir, "exported-images", "cap-a.png"), "png");
-  await call("build_publish_pack", { projectId: proj.id, docId, mode: "seal" }, c);
+  // 截图脚本的产物：画布定一版，assets/ 里放图片和出处文件（skills/protoflow-product-dev/scripts/capture.mjs）
+  await call("build_canvas", { projectId: proj.id, note: "v1" }, c);
+  const assets = path.join(c.ws, proj.id, "docs", docId, "assets");
+  fs.writeFileSync(path.join(assets, "cap-a.png"), "png");
+  fs.writeFileSync(path.join(assets, "cap-a.png.source.json"), JSON.stringify({ ref: `canvas:main@1#${ab.id}` }));
   fs.writeFileSync(path.join(c.ws, proj.id, "docs", docId, "doc.md"), md);
   const built = await call("build_doc", { projectId: proj.id, docId, mode: "finalize", note: "首版" }, c);
   return { c, proj, ab, built };
 }
 
-test("record_publish 后 chain_status 报 lagging；get_guide 正常与未知主题", async () => {
+test("record_publish 后 get_project(findings) 报 lagging；get_guide 正常与未知主题", async () => {
   const c = ctx();
   const { proj, ab, built } = await fullDoc(c, { md: "# t\n\n![截图](assets/cap-a.png)\n" });
   assert.equal(built.ok, true, JSON.stringify(built));
@@ -179,62 +179,64 @@ test("record_publish 后 chain_status 报 lagging；get_guide 正常与未知主
   const rec = await call("record_publish", { projectId: proj.id, docId: "prd", channel: "dingtalk", channelDocId: "d1", url: "u" }, c);
   assert.equal(rec.ok, true, JSON.stringify(rec));
   await call("save_artboard_source", { projectId: proj.id, artboardId: ab.id, source: `function Component(){ return <div id="a">改</div>; }` }, c);
-  const status = await call("chain_status", { projectId: proj.id }, c);
+  // 引用锚定在画布 v1：只改源码没定版，画布最新版没变，只报"画布有没定版的改动"
+  const before = await call("get_project", { projectId: proj.id, findings: true }, c);
+  assert.deepEqual(before.findings.map((f) => f.code), ["canvas_uncommitted"]);
+  await call("build_canvas", { projectId: proj.id, note: "改了画板" }, c);
+  const status = await call("get_project", { projectId: proj.id, findings: true }, c);
   assert.ok(status.findings.some((f) => f.code === "publish_lagging"));
-  assert.ok(status.findings.some((f) => f.code === "doc_drifted"));
+  assert.ok(status.findings.some((f) => f.code === "ref_stale" && f.target === "doc:prd"));
   const guide = await call("get_guide", { topic: "workflow" }, c);
-  assert.ok(guide.content.includes("chain_status"));
+  assert.ok(guide.content.includes("findings"));
   const badTopic = await call("get_guide", { topic: "nope" }, c);
   assert.equal(badTopic.ok, false);
   assert.ok(badTopic.error.message.includes("workflow"));
 });
 
-test("record_publish：doc.md 有未确认的开放问题标记时默认拦截，acknowledgeFindings:true 可跳过", async () => {
+test("get_guide：框架的 guides/ 加各产品注册的 guidesDir，主题全局唯一", async () => {
+  const c = ctx();
+  for (const topic of ["workflow", "publish-dingtalk", "artboard", "annotation", "doc-writing", "sheet-schema"]) {
+    const g = await call("get_guide", { topic }, c);
+    assert.ok(g.content && g.content.length > 50, topic);
+  }
+  const topics = Object.keys(guideFiles(guidesDir));
+  assert.equal(new Set(topics).size, topics.length);
+});
+
+test("record_publish 只登记事实，不做发布前检查（检查是配方的事）；kind 选产物类型", async () => {
   const c = ctx();
   const { proj, built } = await fullDoc(c, { md: "# t\n\n![截图](assets/cap-a.png)\n\n某边界情况 **需要与研发确认**。\n" });
   assert.equal(built.ok, true, JSON.stringify(built));
-  assert.ok(built.findings.some((f) => f.code === "OPEN_QUESTION" && f.level === "error"), "finalize 结果里提前带出开放问题");
-
-  const blocked = await call("record_publish", { projectId: proj.id, docId: "prd", channel: "dingtalk", channelDocId: "d1" }, c);
-  assert.equal(blocked.ok, false);
-  assert.equal(blocked.error.code, "CHECKS_FAILED");
-  assert.ok(blocked.error.message.includes("需要与研发确认"));
-
-  const acked = await call("record_publish", { projectId: proj.id, docId: "prd", channel: "dingtalk", channelDocId: "d1", acknowledgeFindings: true }, c);
-  assert.equal(acked.ok, true, JSON.stringify(acked));
+  const rec = await call("record_publish", { projectId: proj.id, docId: "prd", channel: "dingtalk", channelDocId: "d1" }, c);
+  assert.equal(rec.ok, true, JSON.stringify(rec));
+  assert.equal(rec.recordCount, 1);
+  const missing = await call("record_publish", { projectId: proj.id, docId: "nope", kind: "sheet", channel: "dingtalk", channelDocId: "d2" }, c);
+  assert.equal(missing.error.code, "DOC_NOT_BUILT");
+  assert.match(missing.error.message, /表格 nope 尚未 build_sheet/);
 });
 
-test("get_doc_kind：返回模板 + 撰写规范 + 元数据；未知类型列出可用类型", async () => {
+test("labels：建画布、文档、表格时传，set_labels 整组替换，get_project 的 graph 原样返回", async () => {
   const c = ctx();
   const proj = await call("create_project", { name: "T" }, c);
-  const k = await call("get_doc_kind", { projectId: proj.id, kind: "prd" }, c);
-  assert.equal(k.label, "PRD");
-  assert.equal(k.contextSource, "canvas");
-  assert.ok(k.template.includes("<!-- protoflow:changelog -->"));
-  assert.ok(k.writing.length > 10);
-  const bad = await call("get_doc_kind", { projectId: proj.id, kind: "nope" }, c);
-  assert.equal(bad.ok, false);
-  assert.ok(bad.error.message.includes("prd"));
+  await call("create_canvas", { projectId: proj.id, title: "管理端", canvasId: "admin", labels: ["x/canvas"] }, c);
+  await call("create_doc", { projectId: proj.id, docId: "prd", labels: ["product-dev/prd"] }, c);
+  await call("create_sheet", { projectId: proj.id, sheetId: "s", labels: ["x/sheet"] }, c);
+  const labelsOf = async () => Object.fromEntries((await call("get_project", { projectId: proj.id }, c)).graph.artifacts.map((a) => [`${a.type}:${a.id}`, a.labels]));
+  assert.deepEqual(await labelsOf(), { "canvas:admin": ["x/canvas"], "doc:prd": ["product-dev/prd"], "sheet:s": ["x/sheet"] });
+  assert.deepEqual((await call("set_labels", { projectId: proj.id, type: "doc", id: "prd", labels: ["a", "b"] }, c)).labels, ["a", "b"]);
+  await call("set_labels", { projectId: proj.id, type: "sheet", id: "s", labels: [] }, c);
+  assert.deepEqual(await labelsOf(), { "canvas:admin": ["x/canvas"], "doc:prd": ["a", "b"], "sheet:s": [] });
+  assert.equal((await call("set_labels", { projectId: proj.id, type: "doc", id: "nope", labels: [] }, c)).error.code, "NOT_FOUND");
+  assert.equal((await call("set_labels", { projectId: proj.id, type: "doc", id: "prd", labels: [""] }, c)).error.code, "BAD_LABELS");
 });
 
-test("build_publish_pack previews 模式：每个 capture 除 htmlPath 外也带 http://127.0.0.1 的 url", async () => {
+test("截图不再是文档的构建步骤：build_publish_pack 工具已去掉，build_doc 只有 finalize", async () => {
+  assert.equal(TOOL_MAP.build_publish_pack, undefined);
   const c = ctx();
   const proj = await call("create_project", { name: "T" }, c);
-  const pg = await call("upsert_page", { projectId: proj.id, name: "pg" }, c);
-  const ab = await call("upsert_artboard", { projectId: proj.id, pageId: pg.id, name: "板" }, c);
-  await call("save_artboard_source", { projectId: proj.id, artboardId: ab.id, source: `function Component(){ return <div id="a">x</div>; }` }, c);
-  await call("create_doc", { projectId: proj.id, kind: "prd" }, c);
-  const bdir = path.join(c.ws, proj.id, "docs", "prd", ".build");
-  fs.mkdirSync(bdir, { recursive: true });
-  fs.writeFileSync(path.join(bdir, "captures.json"), JSON.stringify({ captures: [{ id: "cap-a", artboardId: ab.id, title: "A", annotationIds: [] }] }));
-  await call("build_doc", { projectId: proj.id, docId: "prd", mode: "snapshot" }, c);
-
-  const r = await call("build_publish_pack", { projectId: proj.id, docId: "prd", mode: "previews" }, c);
-  assert.equal(r.ok, true);
-  assert.equal(r.previews.length, 1);
-  assert.match(r.previews[0].url, /^http:\/\/127\.0\.0\.1:\d+\/p\/[^/]+\//);
-  assert.ok(!r.previews[0].url.includes("ann=1"), "截图是画板状态的干净图，不再往上叠标注编号");
-  assert.equal((await fetch(r.previews[0].url)).status, 200);
+  await call("create_doc", { projectId: proj.id, docId: "prd", ...tpl("prd") }, c);
+  const r = await call("build_doc", { projectId: proj.id, docId: "prd", mode: "snapshot" }, c);
+  assert.equal(r.error.code, "BAD_MODE");
 });
 
 test("export_canvas：写到 outDir 下，文件名 = 项目名 + .zip，内容是真实合法的 zip", async () => {
@@ -244,7 +246,7 @@ test("export_canvas：写到 outDir 下，文件名 = 项目名 + .zip，内容�
   const ab = await call("upsert_artboard", { projectId: proj.id, pageId: pg.id, name: "板" }, c);
   await call("save_artboard_source", { projectId: proj.id, artboardId: ab.id, source: `function Component(){ return <div id="a">x</div>; }` }, c);
 
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-mcp-export-"));
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-cli-export-"));
   const r = await call("export_canvas", { projectId: proj.id, outDir }, c);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.path, path.join(outDir, "招聘.zip"));
@@ -255,7 +257,7 @@ test("export_canvas：写到 outDir 下，文件名 = 项目名 + .zip，内容�
 test("export_doc：写到 outDir 下，文件名 = 文档标题 + .zip；无版本时报 DOC_NOT_BUILT", async () => {
   const c = ctx();
   const { proj } = await fullDoc(c, { md: "# t\n\n![截图](assets/cap-a.png)\n" });
-  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-mcp-export-"));
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-cli-export-"));
   const r = await call("export_doc", { projectId: proj.id, docId: "prd", outDir }, c);
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.equal(r.path, path.join(outDir, "t.zip"));
@@ -267,8 +269,112 @@ test("export_doc：写到 outDir 下，文件名 = 文档标题 + .zip；无版�
   assert.ok(fs.statSync(word.path).size > 0);
 
   const proj2 = await call("create_project", { name: "T2" }, c);
-  await call("create_doc", { projectId: proj2.id, kind: "prd" }, c);
+  await call("create_doc", { projectId: proj2.id, docId: "prd", ...tpl("prd") }, c);
   const noVersion = await call("export_doc", { projectId: proj2.id, docId: "prd", outDir }, c);
   assert.equal(noVersion.ok, false);
   assert.equal(noVersion.error.code, "DOC_NOT_BUILT");
+});
+
+test("create_sheet/build_sheet/export_sheet：完整走一遍工具层", async () => {
+  const c = ctx();
+  const proj = await call("create_project", { name: "T" }, c);
+  const created = await call("create_sheet", { projectId: proj.id, sheetId: "sales", title: "销售数据" }, c);
+  assert.equal(created.ok, true, JSON.stringify(created));
+
+  const noNote = await call("build_sheet", { projectId: proj.id, sheetId: "sales" }, c);
+  assert.equal(noNote.ok, false);
+  assert.equal(noNote.error.code, "NOTE_REQUIRED");
+
+  const sheetJsonPath = path.join(c.ws, proj.id, "sheets", "sales", "sheet.json");
+  fs.writeFileSync(sheetJsonPath, JSON.stringify({
+    schemaVersion: 1, title: "销售数据",
+    sheets: [{ name: "明细", rows: [["姓名", "销售额"], ["张三", 120000]], styles: { rows: { "0": "font-weight:600;" } } }],
+  }));
+  const built = await call("build_sheet", { projectId: proj.id, sheetId: "sales", note: "首版" }, c);
+  assert.equal(built.ok, true, JSON.stringify(built));
+  assert.equal(built.version, 1);
+  assert.match(built.url, /^http:\/\/127\.0\.0\.1:\d+\/p\/[^/]+\//);
+  assert.equal((await fetch(built.url)).status, 200);
+
+  const outDir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-cli-export-sheet-"));
+  const exported = await call("export_sheet", { projectId: proj.id, sheetId: "sales", outDir }, c);
+  assert.equal(exported.ok, true, JSON.stringify(exported));
+  assert.equal(exported.path, path.join(outDir, "销售数据.xlsx"));
+  assert.ok(fs.existsSync(exported.path) && fs.statSync(exported.path).size === exported.bytes);
+
+  const proj2 = await call("create_project", { name: "T2" }, c);
+  await call("create_sheet", { projectId: proj2.id, sheetId: "sales" }, c);
+  const noVersion = await call("export_sheet", { projectId: proj2.id, sheetId: "sales", outDir }, c);
+  assert.equal(noVersion.ok, false);
+  assert.equal(noVersion.error.code, "SHEET_NOT_BUILT");
+});
+
+test("record_publish：kind:\"sheet\" 登记到表格 head 版本，不跑 doc 那套 checks", async () => {
+  const c = ctx();
+  const proj = await call("create_project", { name: "T" }, c);
+  await call("create_sheet", { projectId: proj.id, sheetId: "sales" }, c);
+  const sheetJsonPath = path.join(c.ws, proj.id, "sheets", "sales", "sheet.json");
+  fs.writeFileSync(sheetJsonPath, JSON.stringify({ schemaVersion: 1, title: "销售数据", sheets: [{ name: "A", rows: [["a"]] }] }));
+
+  const beforeBuild = await call("record_publish", { projectId: proj.id, docId: "sales", kind: "sheet", channel: "dingtalk", channelDocId: "d1" }, c);
+  assert.equal(beforeBuild.ok, false);
+  assert.equal(beforeBuild.error.code, "DOC_NOT_BUILT");
+
+  await call("build_sheet", { projectId: proj.id, sheetId: "sales", note: "首版" }, c);
+  const rec = await call("record_publish", { projectId: proj.id, docId: "sales", kind: "sheet", channel: "dingtalk", channelDocId: "d1", url: "u" }, c);
+  assert.equal(rec.ok, true, JSON.stringify(rec));
+  assert.equal(rec.version, 1);
+  assert.equal(rec.recordCount, 1);
+  assert.ok(rec.sheetHash);
+
+  const dj = JSON.parse(fs.readFileSync(path.join(c.ws, proj.id, "sheets", "sales", "doc.json"), "utf8"));
+  assert.equal(dj.versions[0].publishedTo.length, 1);
+  assert.equal(dj.versions[0].publishedTo[0].channel, "dingtalk");
+});
+
+test("build_canvas：定版返回画布页地址；get_project / render_canvas 带画布版本状态", async () => {
+  const c = ctx();
+  const { id } = await call("create_project", { name: "画布定版" }, c);
+  const pg = await call("upsert_page", { projectId: id, name: "首页" }, c);
+  await call("upsert_artboard", { projectId: id, pageId: pg.id, name: "A" }, c);
+  assert.equal((await call("build_canvas", { projectId: id, note: " " }, c)).error.code, "NOTE_REQUIRED");
+  const r = await call("build_canvas", { projectId: id, note: "首版" }, c);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.version, 1);
+  assert.ok(r.url.endsWith("/canvases/main/canvas.html"), r.url);
+  const gp = await call("get_project", { projectId: id }, c);
+  assert.deepEqual(gp.canvases.map(({ id, head, dirty, versionCount }) => ({ id, head, dirty, versionCount })), [{ id: "main", head: 1, dirty: false, versionCount: 1 }]);
+  assert.equal("canvas" in gp, false, "不再有单画布时代的 canvas 字段");
+  await call("upsert_artboard", { projectId: id, pageId: pg.id, name: "B" }, c);
+  const rc = await call("render_canvas", { projectId: id }, c);
+  assert.deepEqual(rc.canvas, { head: 1, dirty: true }, "有改动没定版");
+});
+
+test("delete：整个产物写 类型:id（画布/文档/表格），页面/画板写 id；引用因此失效时带 warning；认不出的写法报错", async () => {
+  const c = ctx();
+  const proj = await call("create_project", { name: "删" }, c);
+  const pg = await call("upsert_page", { projectId: proj.id, name: "页" }, c);
+  const ab = await call("upsert_artboard", { projectId: proj.id, pageId: pg.id, name: "板" }, c);
+  await call("save_artboard_source", { projectId: proj.id, artboardId: ab.id, source: `function Component(){ return <div id="a">x</div>; }` }, c);
+  await call("build_canvas", { projectId: proj.id, note: "v1" }, c);
+  await call("create_doc", { projectId: proj.id, docId: "prd", content: "# PRD\n" }, c);
+  const built = await call("build_doc", { projectId: proj.id, docId: "prd", note: "首版", sources: [`canvas:main#${ab.id}`] }, c);
+  assert.equal(built.ok, true, JSON.stringify(built));
+  await call("create_sheet", { projectId: proj.id, sheetId: "s" }, c);
+
+  assert.equal((await call("delete", { projectId: proj.id, targetId: "bogus" }, c)).error.code, "BAD_TARGET");
+  assert.equal((await call("delete", { projectId: proj.id, targetId: "nope:x" }, c)).error.code, "BAD_TARGET");
+  assert.equal((await call("delete", { projectId: proj.id, targetId: "doc:nope" }, c)).error.code, "NOT_FOUND");
+
+  const s = await call("delete", { projectId: proj.id, targetId: "sheet:s" }, c);
+  assert.deepEqual([s.ok, s.deleted, s.id, s.warning], [true, "sheet", "s", undefined]);
+  assert.equal(fs.existsSync(path.join(c.ws, proj.id, "sheets", "s")), false);
+
+  const cv = await call("delete", { projectId: proj.id, targetId: "canvas:main" }, c);
+  assert.equal(cv.deleted, "canvas");
+  assert.match(cv.warning, /doc:prd/, "文档引用了这个画布，删掉后要提示");
+  assert.deepEqual((await call("get_project", { projectId: proj.id }, c)).canvases, []);
+
+  assert.equal((await call("delete", { projectId: proj.id, targetId: "doc:prd" }, c)).deleted, "doc");
+  assert.equal(TOOL_REGISTRY.filter((t) => t.name === "delete").length, 1, "只有一个 delete 工具");
 });

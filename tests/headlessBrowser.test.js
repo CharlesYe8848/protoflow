@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickBrowserExecutable } from "../core/headlessBrowser.js";
+import { pickBrowserExecutable } from "../skills/protoflow-product-dev/scripts/lib/headlessBrowser.js";
 
 test("pickBrowserExecutable：按优先级顺序取第一个真的找到的候选——环境变量 > 系统已装 > 本地缓存，跳过没找到的（null）", () => {
   assert.deepEqual(

@@ -1,0 +1,57 @@
+/* 瑞士风（swiss）的皮肤：国际主义排版的思路——直角、网格、强对比；超大字用细体、标题中粗，标签用大写小字；
+   不用圆角、阴影、渐变，卡片不填底色，只在顶上压一道粗线；一个高饱和强调色做焦点。版式骨架在 layouts.css，配色在 theme.css。 */
+:root{
+  --ink:#111111; --ink-2:#2b2b2b; --muted:#6b6b6b; --faint:#9a9a9a; --line:#d4d4d4; --tint:#f2f2f0; --paper:#ffffff; --dark:#111111;
+  --chart-soft:#c9c9c9;
+  --font:"Helvetica Neue","PingFang SC","Microsoft YaHei",Arial,sans-serif; --font-display:var(--font);
+  --t-display:168px; --t-h1:120px; --t-h2:76px;
+  --w-display:300; --w-title:600; --w-h3:600; --w-strong:700;
+  --track-display:-.035em; --track-title:-.015em;
+  --r-lg:0; --r-md:0; --r-sm:0; --r-pill:0; --bullet-size:14px; --bullet-radius:0; --dot-radius:0;
+  --rule:2px; --panel-bg:transparent; --panel-border:0 solid transparent;
+  --chart-radius:0; --chart-weight:600;
+}
+/* 标签：大写小字、字距拉开，颜色用墨色（强调色只留给焦点） */
+section .kicker{color:var(--ink);font-weight:600;letter-spacing:.2em}
+section .kicker::before{content:"";display:inline-block;width:36px;height:12px;margin-right:18px;background:var(--accent);vertical-align:.08em}
+section.is-accent .kicker::before,section.is-dark .kicker::before{background:currentColor}
+/* 面板（卡片、对比栏、流程步骤）：不填底，顶上一道粗墨线；强调的那张整块强调色 */
+section[data-layout="cards"] .card,section[data-layout="compare"] .col,section .flow>li{border:0;border-top:8px solid var(--ink);padding-left:0;padding-right:0;padding-top:44px}
+section[data-layout="cards"] .card.is-highlight,section[data-layout="compare"] .col.is-highlight,section .flow>li.is-key{border-top-color:var(--accent);padding-left:40px;padding-right:40px}
+section .flow.is-vertical>li{border-top:0;border-left:8px solid var(--ink);padding:24px 32px}
+section .flow.is-vertical>li.is-key{border-left-color:var(--accent)}
+section .icon-badge{background:transparent;color:var(--accent);width:auto!important;height:auto!important;justify-content:flex-start}
+section[data-layout="icon-grid"] .items:not(.is-6) .icon-badge{font-size:120px}
+section[data-layout="icon-grid"] .items.is-6 .icon-badge{font-size:80px}
+section[data-layout="cards"] .card .icon-badge,section .flow>li .icon-badge{font-size:88px}
+section .flow>li .icon-badge{background:transparent}
+section[data-layout="cards"] .card.is-highlight .icon-badge,section .flow>li.is-key .icon-badge{background:transparent}
+/* 大数字、封面标题：细体大字 */
+section[data-layout="metrics"] .metric{border-top:var(--rule) solid var(--ink);padding-top:32px}
+section[data-layout="metrics"] .metric.is-key{border-top:8px solid var(--accent)}
+section[data-layout="big-number"] .number{font-weight:200}
+/* 封面：右边一个大圆形色块压出画面，标题细体超大 */
+section[data-layout="cover"]::before{content:"";position:absolute;right:-220px;top:-220px;width:920px;height:920px;border-radius:50%;background:var(--accent)}
+section[data-layout="cover"] .meta{border-top:var(--rule) solid var(--ink)}
+section[data-layout="cover-split"]>figure{font-size:320px}
+/* 章节页：整页强调色，编号超大细体 */
+section[data-layout="section"]{background:var(--accent);--ink:var(--accent-ink);--muted:var(--accent-ink)}
+section[data-layout="section"] .num{font-family:var(--font);font-weight:200;font-size:280px;color:var(--accent-ink);letter-spacing:-.04em}
+section[data-layout="section"] h2{font-weight:600;color:var(--accent-ink)}
+section[data-layout="section"] p{color:var(--accent-ink);opacity:.85}
+/* 观点、引言：细体大字；引言左边一道强调色粗线 */
+section[data-layout="statement"] h2{font-weight:300;font-size:120px;letter-spacing:-.03em}
+section[data-layout="statement"] h2 em{font-weight:600}
+section[data-layout="quote"] blockquote{font-weight:300;font-size:96px;padding-left:64px;border-left:16px solid var(--accent)}
+section[data-layout="quote"] cite{padding-left:80px}
+/* 目录：编号换成细体大数字 */
+section[data-layout="agenda"] ol>li::before{font-family:var(--font);font-weight:300;font-size:64px;color:var(--accent)}
+section[data-layout="agenda"] ol>li{border-bottom-color:var(--ink)}
+/* 时间线：方点、墨线 */
+section[data-layout="timeline"] ol.timeline>li{border-top-color:var(--ink);border-top-width:4px}
+/* 结束页：整页墨色，右下一块强调色 */
+section[data-layout="end"]{background:var(--dark);--ink:#fff;--muted:#bdbdbd;color:#fff}
+section[data-layout="end"] h2{font-weight:300;color:#fff}
+section[data-layout="end"]::after{content:"";position:absolute;right:var(--pad-x);bottom:var(--pad-y);width:240px;height:240px;background:var(--accent)}
+/* 对比的"推荐"标签：方角 */
+section[data-layout="compare"] .col .tag{border-radius:0}

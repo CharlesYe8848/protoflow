@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyCaptureMarkers, validateMarkers } from '../core/captureMarkers.js';
-import { layoutMarkers } from '../core/markerLayout.js';
-import { resolveBrowserExecutable } from '../core/headlessBrowser.js';
+import { applyCaptureMarkers, validateMarkers } from '../skills/protoflow-product-dev/scripts/lib/captureMarkers.js';
+import { layoutMarkers } from '../skills/protoflow-product-dev/scripts/lib/markerLayout.js';
+import { resolveBrowserExecutable } from '../skills/protoflow-product-dev/scripts/lib/headlessBrowser.js';
 import { launch } from 'puppeteer-core';
 
 test('marker schema rejects ambiguous numbering and malformed values', () => {

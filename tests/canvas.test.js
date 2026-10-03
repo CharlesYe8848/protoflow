@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildCanvasHtml } from "../core/canvas.js";
+import { buildCanvasHtml } from "../products/canvas/canvas.js";
 
 const twoPages = [
   { id: "pg_1", name: "登录流程", artboards: [{ id: "ab_1", name: "登录页", description: "d", hasSource: true, canvasWidth: 1440 }] },
@@ -22,25 +22,26 @@ test("画板 iframe 不带 loading=\"lazy\"——回归测试：画布用 CSS tr
 
 test("buildCanvasHtml exportBundle：画板还是 <iframe src=...>（不是 srcdoc）、砍掉取元素/模式工具栏/文档菜单/项目切换/分享按钮、取景内联、带 generator meta", () => {
   const html = buildCanvasHtml({
-    projectName: "登录流程演示", pages: twoPages, docs: [],
+    projectName: "登录流程演示", pages: twoPages,
     exportBundle: { canvasState: { activePage: "pg_1" } },
   });
   assert.ok(html.includes('<meta name="generator" content="protoflow-canvas-export"/>'));
   assert.ok(html.includes('<iframe src="pages/pg_1/artboards/ab_1/preview.html"'), "画板还是指向 preview.html 的 src iframe，不是 srcdoc");
   assert.ok(!/class="pf-frame__box"><iframe[^>]*\bsrcdoc=/.test(html), "画板 iframe 标签本身不带 srcdoc 属性（注释里提到这个词不算）");
-  assert.ok(html.includes('<div class="pf-mode-toolbar">') && html.includes('class="pf-sidebar-toggle-btn"'), "顶部小工具栏还在，但只剩侧边栏收起/展开这一个按钮——导出包仍带 .pf-sidebar 页面列表，看的人也需要能收起它腾地方看画板，不是编辑态专属功能");
-  assert.ok(!html.includes('class="pf-mode-interact') && !html.includes('class="pf-mode-select') && !html.includes('<div class="pf-doc-entry">'), "取元素模式切换/文档菜单仍然砍掉——那几个要活的预览服务撑腰，导出包里用不了（CSS 里的选择器仍在，元素不出）");
+  assert.ok(!html.includes('<div class="pf-mode-toolbar" data-pf-chrome>'), "模式工具栏整条不出——里面只有取元素/模式切换，导出包用不了");
+  assert.ok(html.includes('<div class="pf-pgsel">') && html.includes('data-page="pg_2"'), "顶栏的页面切换照常在，看的人要能切页面");
+  assert.ok(!html.includes('class="pf-mode-interact') && !html.includes('class="pf-mode-select'), "取元素模式切换仍然砍掉——那几个要活的预览服务撑腰，导出包里用不了（CSS 里的选择器仍在，元素不出）");
   assert.ok(!html.includes('class="pf-frame__open"'), "「新标签打开」没有目标，去掉（CSS 选择器仍在，元素不出）");
   assert.ok(html.includes(".pf-toolbar{"), "缩放工具栏的 CSS 仍在（保留缩放）");
   assert.ok(html.includes('<script src="lib/marked.min.js">'), "marked 还是引 lib/ 真实文件，不内联");
   assert.ok(html.includes('window.__PF_CANVAS_STATE__ = {"activePage":"pg_1"}'), "导出取景内联，不 fetch（导出目录没有 __protoflow_state 端点）");
-  assert.ok(!html.includes('class="pf-canvas-export"'), "导出的 index.html 不渲染「导出」按钮");
+  assert.ok(!html.includes('class="pf-hdr-share"'), "导出的 index.html 不渲染「分享」按钮");
   assert.ok(html.includes("var __PF_EXPORT__ = true;"));
 });
 
 test("buildCanvasHtml 非导出分支：右上角「导出」按钮点开菜单，两行（项目 HTML / 单页 HTML）各带 data-format，POST 到 __protoflow_export/canvas/<formatId>；没有 generator meta", () => {
   const html = buildCanvasHtml({ projectName: "P", pages: twoPages });
-  assert.ok(html.includes('class="pf-canvas-export"') && html.includes("__protoflow_export/canvas/"));
+  assert.ok(/<div class="pf-hdr-r"><button class="pf-hdr-fs"[^>]*>[\s\S]*?<\/button><div class="pf-export-entry">/.test(html) && html.includes('class="pf-hdr-share"') && html.includes("__protoflow_export/canvas/"), "分享在顶栏右端，跟文档/表格/绘图一样");
   assert.ok(html.includes('class="pf-export-menu"'), "导出按钮旁边带菜单弹层");
   assert.ok(html.includes('data-format="zip"') && html.includes('data-format="html"'), "菜单两行分别对应 zip/html 两种格式");
   assert.ok(html.includes("项目 HTML") && html.includes("单页 HTML"), "菜单行标题");
@@ -52,7 +53,7 @@ test("buildCanvasHtml exportBundle.singleFile：画板 iframe 先留空（不静
   const artboardHtml = { ab_1: "<!DOCTYPE html><html><body>画板内容 & \"引号\"</body></html>" };
   const compressedLibs = { "marked.min.js": { format: "gzip", base64: "AAAA" }, "react.production.min.js": { format: "gzip", base64: "BBBB" } };
   const html = buildCanvasHtml({
-    projectName: "登录流程演示", pages: twoPages, docs: [],
+    projectName: "登录流程演示", pages: twoPages,
     exportBundle: { canvasState: { activePage: "pg_1" }, singleFile: true, artboardHtml, compressedLibs },
   });
   assert.ok(!html.includes('<iframe src="pages/'), "单 HTML 导出不再引用 pages/.../preview.html");
@@ -70,12 +71,12 @@ test("buildCanvasHtml exportBundle.singleFile：画板 iframe 先留空（不静
   assert.ok(html.includes("__pfDecompressLibs"), "启动脚本里带了解压函数");
   assert.ok(html.includes("__pfInjectArtboardLibs"), "启动脚本里带了把占位标签换成内联脚本的函数（不是建 Blob URL 共享——那条路径在托管平台的 CSP 下会被拦，见 core/libCodec.js 的注释）");
   assert.ok(!html.includes("blobUrls") && !html.includes('"text/javascript"'), "不再用 Blob URL 共享库源码这条路径（createObjectURL 本身在别处——导出按钮自己的下载逻辑——还有正常用途，不能拿它整体判定）");
-  assert.ok(!html.includes('class="pf-canvas-export"'), "单 HTML 导出也不渲染「导出」按钮（跟 zip 导出一样）");
+  assert.ok(!html.includes('class="pf-hdr-share"'), "单 HTML 导出也不渲染「分享」按钮（跟 zip 导出一样）");
 });
 
 test("buildCanvasHtml exportBundle.singleFile：生成的每个 <script> 块本身都不含裸露的闭合脚本序列——回归测试：写在生成脚本模板里的中文注释字面提到过这几个字，会把外层 <script> 标签提前截断，画布启动脚本被切掉后半段，只在托管平台上表现为画板空白，本地测试很难注意到", () => {
   const html = buildCanvasHtml({
-    projectName: "P", pages: twoPages, docs: [],
+    projectName: "P", pages: twoPages,
     exportBundle: { canvasState: {}, singleFile: true, artboardHtml: { ab_1: "<html></html>" }, compressedLibs: {} },
   });
   const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]);
@@ -98,74 +99,25 @@ test("品牌色（黑白灰）以 :root CSS 变量注入，画布内改用 var(-
   assert.ok(!/#0ea5a5|#14c4c4|#0ca3a3/i.test(html), "旧的青色主色不得再出现在画布 HTML 里");
 });
 
-test("侧边栏列出全部页面（只显示名称，不带画板数量）；第一个页面默认 active——回归测试：用户要求去掉页面列表项上的画板数量角标", () => {
+test("顶栏页面切换（参考 FigJam）：按钮 = 叠页图标里写页数 + 当前页名，下拉列出全部页面（只显示名称，不带画板数量）；第一个页面默认 active——用户反馈左侧页面栏太占地方，改放顶栏", () => {
   const html = buildCanvasHtml({ projectName: "P", projectId: "proj_1", pages: twoPages });
+  assert.ok(!html.includes("pf-sidebar"), "不再有左侧页面栏");
+  assert.match(html, /<button class="pf-pgsel-btn" type="button" aria-expanded="false" title="页面"><svg class="pf-pgsel-icon"[^>]*>.*?>2<\/text><\/svg><span class="pf-pgsel-name">登录流程<\/span>/, "按钮带页数和第一个页面的名字");
+  assert.ok(html.includes('<div class="pf-pgsel-menu" hidden><div class="pf-pgsel-head">页面</div><button class="pf-page-item active"'), "下拉默认收起，顶上一个「页面」标题");
+  assert.ok(html.includes("pgselName.textContent = b.textContent"), "切页面时按钮上的页名跟着换（刷新后恢复上次的页面也走这条）");
+  assert.ok(html.includes("html.pf-loading .pf-pgsel{visibility:hidden}"), "状态回来前先藏着，免得先闪一下第一个页面的名字");
+  assert.ok(html.includes("closeOnFrameClick(function(){ setPgselOpen(false); })"), "点画板（跨文档 iframe）也要能关掉下拉");
   assert.ok(html.includes('<button class="pf-page-item active" data-page="pg_1">登录流程</button>'));
   assert.ok(html.includes('<button class="pf-page-item" data-page="pg_2">个人中心</button>'));
   assert.ok(!html.includes("pf-page-item__count"), "不应该再有画板数量角标");
 });
 
-test("左上角项目切换器：brand 包在 .pf-proj 里、带一个 hidden 的 .pf-proj-menu；脚本 setupProjectSwitcher 拉 /__protoflow_projects，>1 个项目才启用，点行整页跳到那个项目的 canvas.html", () => {
+test("画布自己不再带项目切换器和文档菜单——这两个入口挪到了框架层的项目侧边栏（core/projectNav.js）", () => {
   const html = buildCanvasHtml({ projectName: "结账流程", projectId: "proj_1", pages: twoPages });
-  assert.ok(html.includes('<div class="pf-proj"><div class="pf-sidebar__brand"><span class="pf-sidebar__brand-text">结账流程</span></div><div class="pf-proj-menu" hidden></div></div>'), "brand 外面包 .pf-proj，里面多一个 hidden 的 popover 容器");
-  assert.ok(html.includes("function setupProjectSwitcher()") && html.includes("setupProjectSwitcher();"), "脚本里有这个函数且被调用");
-  assert.ok(html.includes('fetch("/__protoflow_projects")'), "数据来自本地服务的最近项目端点");
-  assert.ok(html.includes('list.length > 1') && html.includes('brand.classList.add("pf-sidebar__brand--switch")'), "只有 >1 个项目才把 brand 变成切换器");
-  assert.ok(html.includes('location.href = "/p/" + encodeURIComponent(p.id) + "/canvas.html"'), "点非当前行整页跳到那个项目的画布");
-  assert.ok(html.includes(".pf-proj-menu[hidden]{display:none}"), "popover 用 [hidden] 开合，跟 .pf-doc-menu 一套");
-});
-
-test("没有任何文档时顶部工具栏的文档图标依然常驻显示，点开菜单显示默认态提示文案", () => {
-  const html = buildCanvasHtml({ projectName: "P", projectId: "proj_1", pages: twoPages, docs: [] });
-  assert.ok(html.includes('<div class="pf-doc-entry">'), "图标本身应该始终渲染");
-  assert.ok(html.includes('<div class="pf-doc-menu__empty">暂无文档</div>'));
-  const htmlUndefined = buildCanvasHtml({ projectName: "P", projectId: "proj_1", pages: twoPages });
-  assert.ok(htmlUndefined.includes('<div class="pf-doc-entry">'), "不传 docs 也不应该报错");
-});
-
-test("文档入口：每篇文档都列出来、按类型分组，组头是类型名，行 meta 只留版本+日期；渲染进每个页面的 .pf-mode-toolbar", () => {
-  const html = buildCanvasHtml({
-    projectName: "P", projectId: "proj_1", pages: twoPages,
-    docs: [
-      { id: "prd", kind: "prd", kindLabel: "PRD", title: "结账 PRD", head: 5, updatedAt: "2026-08-27T00:00:00.000Z" },
-      { id: "release-note", kind: "release-note", kindLabel: "上线公告", title: "计费上线", head: 2, updatedAt: "2026-08-20T00:00:00.000Z" },
-      { id: "release-note-q3", kind: "release-note", kindLabel: "上线公告", title: "灵听上线", head: 1, updatedAt: "2026-08-29T00:00:00.000Z" },
-    ],
-  });
-  assert.equal((html.match(/<div class="pf-doc-entry">/g) || []).length, twoPages.length);
-  const toolbarStart = html.indexOf('<div class="pf-mode-toolbar">');
-  const toolbarEnd = html.indexOf("</div>", html.indexOf('<div class="pf-toolbar">'));
-  assert.ok(html.slice(toolbarStart, toolbarEnd).includes('class="pf-doc-btn"'));
-  // 每篇都有自己的入口（3 篇 → 3 个不同链接），不再是「每类型一行 + N 篇」
-  const links = (html.match(/href="docs\/[^"]+\/preview\.html"/g) || []).filter((s, i, a) => a.indexOf(s) === i);
-  assert.deepEqual(links.sort(), [
-    'href="docs/prd/preview.html"', 'href="docs/release-note-q3/preview.html"', 'href="docs/release-note/preview.html"',
-  ].sort());
-  // 组头 = 类型显示名（两种类型 → 两个组头）
-  assert.ok(html.includes('<div class="pf-doc-menu__hd">PRD</div>') && html.includes('<div class="pf-doc-menu__hd">上线公告</div>'));
-  // 组间按「组内最新那篇」时间倒序：上线公告组(08-29) 整体在 PRD 组(08-27) 前
-  assert.ok(html.indexOf('pf-doc-menu__hd">上线公告') < html.indexOf('pf-doc-menu__hd">PRD'));
-  // 组内按更新时间倒序：release-note-q3(08-29) 在 release-note(08-20) 前
-  assert.ok(html.indexOf("灵听上线") < html.indexOf("计费上线"));
-  // 行首是文档名，meta 行只有 v + 日期，不带类型名、不带「N 篇」
-  assert.ok(html.includes("<span>结账 PRD</span>"), "行首显示文档名");
-  assert.ok(html.includes('class="pf-doc-menu__meta">v5 · 2026-08-27</span>'));
-  assert.ok(!/\d+ 篇/.test(html), "不再有「· N 篇」折叠计数");
-  assert.ok(!html.includes('pf-doc-menu__meta">PRD'), "类型名不再进 meta 行");
-  assert.ok(!/https?:\/\//.test(html), "不得包含外部 URL");
-});
-
-test("文档入口：项目只有一种类型时不显示组头，就是一列文档，按更新时间倒序", () => {
-  const html = buildCanvasHtml({
-    projectName: "P", projectId: "proj_1", pages: twoPages,
-    docs: [
-      { id: "prd", kind: "prd", kindLabel: "PRD", title: "结账 PRD", head: 5, updatedAt: "2026-08-27T00:00:00.000Z" },
-      { id: "prd-refund", kind: "prd", kindLabel: "PRD", title: "退款 PRD", head: 1, updatedAt: "2026-08-29T00:00:00.000Z" },
-    ],
-  });
-  assert.ok(!html.includes('<div class="pf-doc-menu__hd">'), "单一类型不加组头");
-  assert.ok(html.includes('href="docs/prd/preview.html"') && html.includes('href="docs/prd-refund/preview.html"'), "两篇都直接列出");
-  assert.ok(html.indexOf("退款 PRD") < html.indexOf("结账 PRD"), "按更新时间倒序");
+  assert.ok(html.includes('<header class="pf-hdr" data-pf-chrome><div class="pf-hdr-l"><span data-pf-nav-slot></span><span class="pf-hdr-title">结账流程</span><span class="pf-hdr-sep"></span><div class="pf-pgsel">'), "顶栏左端：项目栏入口位置 + 纯文字的画布名 + 分隔线 + 页面切换，跟文档/表格/绘图同一条 .pf-hdr");
+  assert.equal((html.match(/<span data-pf-nav-slot><\/span>/g) || []).length, 1, "只在顶栏留一个位置");
+  assert.ok(!html.includes("pf-proj") && !html.includes("setupProjectSwitcher"), "没有项目切换器");
+  assert.ok(!html.includes("pf-doc-entry") && !html.includes("setupDocMenu") && !html.includes("docs/"), "没有文档菜单，也不链到任何文档");
 });
 
 test("只有第一个页面的画布不带 hidden 属性，其它页面初始隐藏（同文档内切换，不是分开的文件）", () => {
@@ -203,7 +155,7 @@ test("有源码的画板悬浮显示新标签页打开按钮（指向自己的 p
   assert.ok(html.includes(".pf-frame:hover .pf-frame__open"), "按钮默认隐藏，悬浮画板才露出来，不常驻占地方");
 });
 
-test("标注入口在画板上（新标签页图标旁）：仅有 annotations.md 的画板才有 .pf-frame__annotate 按钮，点它左侧侧边栏换成这块画板的标注（pf-ann-open）；工具栏不再有标注按钮；md 里的 [名](#el/id) 渲染成可点 chip，定位/高亮走 postMessage", () => {
+test("标注入口在画板上（新标签页图标旁）：仅有 annotations.md 的画板才有 .pf-frame__annotate 按钮，点它画布右侧展开这块画板的标注面板（pf-ann-open）；工具栏不再有标注按钮；md 里的 [名](#el/id) 渲染成可点 chip，定位/高亮走 postMessage", () => {
   const html = buildCanvasHtml({
     projectName: "P", projectId: "proj_1",
     pages: [{ id: "pg_1", name: "p", artboards: [
@@ -221,12 +173,12 @@ test("标注入口在画板上（新标签页图标旁）：仅有 annotations.m
   assert.equal(annBtns.length, 1, "只有有 annotations.md 的画板才有画板级标注按钮");
   const btnIdx = html.indexOf('<button class="pf-frame__annotate"');
   assert.ok(html.indexOf('data-artboard="ab_1"') < btnIdx && btnIdx < html.indexOf('data-artboard="ab_2"'), "标注按钮落在 ab_1 这块画板的 label 里");
-  assert.ok(html.includes("function setupAnnotations()") && html.includes('classList.toggle("pf-ann-open"'), "点画板标注按钮切换左侧侧边栏的页面列表↔该画板标注");
+  assert.ok(html.includes("function setupAnnotations()") && html.includes('classList.toggle("pf-ann-open"'), "点画板标注按钮开合右侧标注面板");
   assert.ok(html.includes('<script src="lib/marked.min.js">'), "标注用 marked 渲染完整 markdown");
   assert.ok(html.includes("marked.parse(src)") && html.includes('a[href^="#el/"]') && html.includes("pf-ann-chip"), "annotations.md 用 marked 渲染，[名](#el/id) 换成可点 chip");
-  assert.ok(html.includes("pf-anns__head") && html.includes("pf-anns__close"), "侧栏顶部有画板名 + 关闭按钮");
+  assert.ok(html.includes("pf-anns__head") && html.includes("pf-anns__close"), "面板顶部有画板名 + 关闭按钮");
   assert.ok(!html.includes("pf-ann-item"), "不再一条一张卡片");
-  assert.ok(html.includes(".pf-ann-md h2") && html.includes(".pf-ann-md ul"), "侧栏是一篇文章：md 自带 h2/h3，列表等紧凑样式");
+  assert.ok(html.includes(".pf-ann-md h2") && html.includes(".pf-ann-md ul"), "面板是一篇文章：md 自带 h2/h3，列表等紧凑样式");
   assert.ok(html.includes('postMessage({ type: "protoflow-annotation-flash"') && html.includes('postMessage({ type: "protoflow-annotation-highlight"') && html.includes('postMessage({ type: "protoflow-annotation-clear"'), "定位 / 悬停批量高亮走 postMessage，不直接调画板 iframe 的函数");
   assert.ok(!html.includes("function idoc("), "不再有同步读画板 contentDocument 的 idoc() 辅助函数（断链检测改成问画板自己）——取元素工具自己那份 contentDocument 读取跟标注无关，不受这次改动影响");
   assert.ok(html.includes('"protoflow-annotation-check-ids-reply"') && html.includes("pendingBrokenCheck"), "断链检测：postMessage 问画板、回执里按 elId 给对应 chip 补 --broken");
@@ -307,22 +259,13 @@ test("缩放工具栏只常驻显示百分比，点击展开菜单（放大/缩�
   assert.ok(/if \(e\.key === "Escape" && !zoomMenu\.hidden\)/.test(html), "ESC 也应该能收起缩放菜单");
 });
 
-test("侧边栏收起/展开状态持久化到项目内 .protoflow/canvas.json（不是 localStorage），routeKey 从当前页面自己的 URL 反推而不是生成时写死 projectId", () => {
+test("画布状态持久化到项目内 .protoflow/canvas.json（不是 localStorage），routeKey 从当前页面自己的 URL 反推而不是生成时写死 projectId", () => {
   const html = buildCanvasHtml({ projectName: "P", pages: twoPages });
   assert.ok(!html.includes("localStorage.getItem") && !html.includes("localStorage.setItem"), "不应该再用 localStorage 存这类状态——按浏览器 origin 隔离，换设备/换浏览器/file:// 与 http:// 之间都跟不过去，不是真正的项目自包含");
   assert.ok(html.includes(".protoflow/canvas.json"), "读取初始状态应该 fetch 项目内的 .protoflow/canvas.json");
   assert.ok(html.includes("__protoflow_state/canvas"), "保存状态应该 POST 到通用的按 key 存取路由（core/localServer.js 的 __protoflow_state），key 是 canvas");
   assert.ok(html.includes("location.pathname"), "routeKey 应该从当前页面自己的 URL 反推——生成时不知道最终会不会因为撞同名项目被服务器加 -2 后缀，写死不准");
-  assert.ok(html.includes('class="pf-sidebar-toggle-btn"'), "需要一个可点击的收起/展开按钮——回归测试：这个按钮从侧边栏头部搬进了顶部小工具栏（.pf-mode-toolbar），跟切换取元素模式的按钮放一起");
-});
-
-test("标注打开时收起侧边栏、刷新后仍保持收起——回归测试：恢复上次打开的标注不能触发「侧栏收着就替用户展开」那条逻辑，否则把用户特意保存的收起状态冲掉", () => {
-  const html = buildCanvasHtml({ projectName: "P", pages: twoPages });
-  // setOpen 带一个「是否恢复态」参数；只有用户主动点标注按钮（restoring 假）才替他展开收起的侧栏
-  assert.ok(html.includes("function setOpen(abId, restoring)"), "setOpen 要能区分「用户点击」和「刷新后恢复」");
-  assert.ok(html.includes('if (!restoring && document.documentElement.classList.contains("pf-sb-c"))'), "恢复态不得强行展开侧栏、不得改 uiState.sidebarCollapsed");
-  // 恢复上次打开的标注时传 restoring=true
-  assert.ok(/setOpen\(want, true\)/.test(html), "boot 里恢复上次标注要走恢复态分支");
+  assert.ok(!html.includes("sidebarCollapsed"), "没有页面栏了，也不再存收起状态");
 });
 
 test("当前选中的页面也要持久化到 .protoflow/canvas.json，刷新页面后应该停留在之前切到的那个页面——回归测试：用户反馈明明切到了第二个页面，刷新后又弹回第一个页面，因为 uiState 之前只存了 sidebarCollapsed 和各页视角，漏了 activePage 这一项", () => {
@@ -332,17 +275,11 @@ test("当前选中的页面也要持久化到 .protoflow/canvas.json，刷新页
   assert.ok(/if \(uiState\.activePage && document\.querySelector\(/.test(html), "boot() 里应该用读到的 uiState.activePage 恢复选中态，而不是永远停在生成时写死的第一个页面");
 });
 
-test("侧边栏收起时完全归零宽度，不留图标条——回归测试：用户参考截图收起状态下工具栏紧贴左边缘，不是旧版留一条 44px 宽的图标带；收起按钮搬进顶部小工具栏后侧边栏自己不再需要在收起态下放任何东西", () => {
-  const html = buildCanvasHtml({ projectName: "P", pages: twoPages });
-  assert.ok(html.includes("html.pf-sb-c .pf-sidebar{width:0;flex:0 0 0"), "收起态应归零宽度，不是旧版的 44px 图标带");
-  assert.ok(!html.includes("pf-sidebar__toggle"), "旧的侧边栏内嵌收起按钮 class 不应再出现，已整体搬进顶部小工具栏");
-});
-
-test("顶部小工具栏（.pf-mode-toolbar）：侧边栏收起图标 + 分隔线 + 取元素模式图标，位置在视口左上角；每个页面各有一份但状态全局同步——回归测试：用户提供参考截图要求把侧边栏收起图标和交互/元素选择模式切换放进同一个简洁图标工具栏，位置贴视口左上角（跟画布随侧边栏宽度自然联动，不用额外 JS 算偏移）", () => {
+test("画布左上角小工具栏（.pf-mode-toolbar）：交互/取元素模式两个图标，位置在视口左上角；每个页面各有一份", () => {
   const html = buildCanvasHtml({ projectName: "P", projectId: "proj_1", pages: twoPages });
-  assert.ok(html.includes(".pf-mode-toolbar{position:absolute;left:16px;top:16px"), "应定位在视口左上角，跟随 .pf-viewport 的实际左边界（侧边栏宽度变化时天然跟着变，不用 JS 算）");
-  assert.ok(html.includes('<div class="pf-mode-toolbar">'), "每个页面自己的画布容器里都要有一份（跟 .pf-toolbar 一样按页面复制，同一时刻只有一份可见）");
-  assert.ok(html.includes("querySelectorAll(\".pf-sidebar-toggle-btn\")"), "侧边栏状态是全局的，多份按钮要一起同步标题/状态，不能只挂当前可见那份");
+  assert.ok(html.includes(".pf-mode-toolbar{position:absolute;left:16px;top:16px"), "应定位在视口左上角，跟随 .pf-viewport 的实际左边界（标注面板开合时天然跟着变，不用 JS 算）");
+  assert.ok(html.includes('<div class="pf-mode-toolbar" data-pf-chrome>'), "每个页面自己的画布容器里都要有一份（跟 .pf-toolbar 一样按页面复制，同一时刻只有一份可见）");
+  assert.ok(!html.includes("pf-sidebar-toggle-btn"), "没有页面栏了，也就没有收起按钮");
 });
 
 test("交互模式、元素选择模式各自一个图标按钮，点击后各自进入选中态——回归测试：改成两个独立按钮而不是一个来回切换图标的按钮，点哪个就切到哪个模式，各自用 pf-mode-active 表达当前选中态", () => {
@@ -358,15 +295,16 @@ test("元素选择模式下按 ESC 退出回交互模式——回归测试：用
   assert.ok(/addEventListener\("keydown",\s*function\(e\)\{\s*if \(e\.key === "Escape" && active\) \{ setActive\(false\); return; \}/.test(html), "应该监听 Escape 键，在取元素模式激活时调用同一个 setActive(false)");
 });
 
-test("快捷键 A 在交互模式/选择模式之间快速切换——用户明确要求；必须排除正在合成面板（contenteditable）或任何输入框里打字的情况（不能拦截用户想打字母 a），也要排除带修饰键的组合（Cmd/Ctrl+A 是原生全选，不能被吞掉）", () => {
+test("快捷键 A 在交互模式/选择模式之间快速切换——用户明确要求；必须排除正在合成面板（contenteditable）或任何输入框里打字的情况（不能拦截用户想打字母 a），带修饰键的组合不当成切换（Cmd/Ctrl+A 是全选当前页的画板，见 selectAll.test.js）", () => {
   const html = buildCanvasHtml({ projectName: "P", projectId: "proj_1", pages: twoPages });
   const anchorIdx = html.indexOf('selectBtns.forEach(function(btn){');
   assert.ok(anchorIdx !== -1, "选择模式按钮的点击监听器应该存在");
   const kdIdx = html.indexOf('document.addEventListener("keydown", function(e){', anchorIdx);
   assert.ok(kdIdx !== -1, "应该有一个统一的 keydown 监听器（在选择模式按钮监听器之后，不是画布缩放菜单那个 Escape 监听器）");
-  const kdBody = html.slice(kdIdx, kdIdx + 700);
+  const kdBody = html.slice(kdIdx, kdIdx + 1600);
   assert.ok(kdBody.includes('if (e.key !== "a" && e.key !== "A") return;'), "要同时接受大小写 a/A（用户可能开着大写锁定或按了 Shift）");
-  assert.ok(kdBody.includes("if (e.metaKey || e.ctrlKey || e.altKey) return;"), "带修饰键时不应该触发——Cmd/Ctrl+A 是原生全选，不能被这个快捷键吞掉");
+  assert.ok(kdBody.includes("if (e.metaKey || e.ctrlKey || e.altKey) return;"), "带修饰键时不应该触发模式切换");
+  assert.ok(kdBody.indexOf("selectAllOnPage();") !== -1 && kdBody.indexOf("selectAllOnPage();") < kdBody.indexOf("setActive(!active);"), "Cmd/Ctrl+A 先被接成全选当前页，不会落到模式切换");
   assert.ok(kdBody.includes("ae.isContentEditable || ae.tagName === \"INPUT\" || ae.tagName === \"TEXTAREA\""), "正在合成面板或任意输入框里打字时，按 a 应该是在打字母，不应该触发模式切换");
   assert.ok(kdBody.includes("setActive(!active);"), "触发时应该在两个模式之间切换，不是只能单向进入某个模式");
 });
@@ -381,22 +319,16 @@ test("切到交互模式时（不管是点交互按钮、点合成面板关闭�
 
 test("顶部小工具栏三个按钮用自定义 tooltip（data-tip + hover 事件委托），不用原生 title——回归测试：图标按钮没有文字标签，用户要求 hover 要有提示；原生 title 弹出延迟长、样式没法控，改成自己实现的悬浮提示，共享一个 tooltip 元素、事件委托到 document，不用每个按钮各挂一份监听器", () => {
   const html = buildCanvasHtml({ projectName: "P", projectId: "proj_1", pages: twoPages });
-  assert.ok(!html.includes('title="收起侧边栏"') && !html.includes('title="展开侧边栏"'), "侧边栏按钮不应该再用原生 title，避免和自定义 tooltip 同时弹出两个提示");
   assert.ok(html.includes("pf-mode-tooltip") && html.includes('createElement("div")'), "需要一个共享的 tooltip 元素");
   assert.ok(html.includes('".pf-mode-toolbar button, .pf-frame__label a, .pf-frame__label button"') && html.includes('addEventListener("mouseover"') && html.includes('addEventListener("mouseout"'), "hover 提示委托到 document 一处监听（同一份 tooltip 逻辑也覆盖画板标签里的新标签页打开 + 标注按钮），不是给每个按钮各挂一份");
   assert.ok(html.includes(".pf-mode-tooltip:before{"), "回归测试：参考截图里 tooltip 带一个指向触发按钮的小箭头（尖角），不是光秃秃一个圆角矩形");
 });
 
-test("侧边栏收起/展开不带 CSS 过渡动画——回归测试：曾经给 .pf-sidebar 加过 width/flex-basis 的 transition，结果收起状态下刷新页面即使 class 在渲染前就已经应用好、且已经加了 transition:none 覆盖，用户实测仍然反馈会先展开一帧再收起（可能是过渡动画本身在 visibility:hidden 揭示的瞬间才追上目标值这类更细的时序问题，排查成本远高于价值）；改成宽度直接瞬间切换，从根上让这一类问题不可能发生", () => {
-  const html = buildCanvasHtml({ projectName: "P", pages: twoPages });
-  assert.ok(!/\.pf-sidebar\{[^}]*transition/.test(html), ".pf-sidebar 不应该再有任何 transition 声明");
-});
-
-test("<html> 默认带 pf-loading class（纯静态属性，零延迟）；侧边栏在这个 class 下 visibility:hidden，直到状态 fetch 回来才摘掉——避免先展开一帧、状态到了才发现该收起的闪烁", () => {
+test("<html> 默认带 pf-loading class（纯静态属性，零延迟）；顶栏页面切换在这个 class 下 visibility:hidden，直到状态 fetch 回来才摘掉——避免先显示第一个页面名、状态到了才换成上次停留的页面", () => {
   const html = buildCanvasHtml({ projectName: "P", pages: twoPages });
   assert.ok(html.startsWith('<!DOCTYPE html><html lang="zh-CN" class="pf-loading">'), "html 标签默认带 pf-loading，是纯 HTML 属性不靠脚本，保证在任何 JS 跑之前就已经是隐藏状态");
-  assert.ok(html.includes("html.pf-loading .pf-sidebar{visibility:hidden}"));
-  assert.ok(html.includes('document.documentElement.classList.remove("pf-loading")'), "状态 fetch 回来、boot() 跑完之后要摘掉这个 class 才露出侧边栏");
+  assert.ok(html.includes("html.pf-loading .pf-pgsel{visibility:hidden}"));
+  assert.ok(html.includes('document.documentElement.classList.remove("pf-loading")'), "状态 fetch 回来、boot() 跑完之后要摘掉这个 class 才露出页面切换");
 });
 
 test("首次露出前整个页面（视口+工具栏）带 pf-loading（visibility:hidden），fit() 由画板真实高度上报驱动而非猜时间——回归测试：修之前先按占位高度以 100% 画一帧（连工具栏的缩放百分比文字都先显示 100%）、几百毫秒后才跳到正确缩放，肉眼可见闪烁", () => {

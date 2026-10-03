@@ -47,3 +47,10 @@ git push -u origin main
 5. 创建 `v0.1.0` tag 和标记为 **Pre-release** 的 GitHub Release，正文使用 [首版说明](release-v0.1.0.md)。Release 中相对文档链接需换成公开仓库链接。
 
 后续公开开发以新仓库为准；不要合并原开发仓库历史，也不要把重复快照覆盖到已经有协作改动的目录。
+
+## 后续版本
+
+1. 更新 `package.json`、`package-lock.json`、README 页脚和对应的 `docs/release-vX.Y.Z.md`。
+2. 将新版发布说明加入 `scripts/prepare-public.mjs` 的公开文档白名单。
+3. 完整测试后生成新的公开快照，与 GitHub `main` 对比并提交。
+4. 推送 `main`，创建带说明的 `vX.Y.Z` 标签和 GitHub Release；预览阶段标记为 **Pre-release**。

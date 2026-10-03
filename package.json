@@ -1,31 +1,41 @@
 {
   "name": "protoflow",
-  "version": "0.1.0",
-  "description": "交互原型、元素标注与 PRD 版本管理，支持 MCP 和 CLI",
+  "version": "0.2.0",
+  "description": "面向 AI 助手的原型、文档、表格、绘图与幻灯片工作流（CLI）",
   "type": "module",
   "license": "MIT",
   "bin": {
-    "protoflow-mcp": "mcp/server.js",
     "protoflow": "bin/protoflow-cli.js"
   },
+  "exports": {
+    "./sdk": "./core/sdk.js",
+    "./sdk/internal": "./core/sdk-internal.js",
+    "./sdk/testing": "./core/sdk-testing.js",
+    "./package.json": "./package.json"
+  },
   "scripts": {
-    "test": "node --test tests/*.test.js",
-    "start": "node mcp/server.js",
+    "test": "node scripts/run-tests.mjs",
     "demo": "node scripts/demo.mjs",
-    "selfcheck": "node mcp/server.js --selfcheck && node bin/protoflow-cli.js --selfcheck"
+    "selfcheck": "node bin/protoflow-cli.js --selfcheck"
   },
   "engines": {
     "node": ">=22.12.0"
   },
   "dependencies": {
     "@babel/standalone": "^7.24.7",
-    "@modelcontextprotocol/sdk": "^1.12.0",
     "@puppeteer/browsers": "^3.2.1",
+    "d3": "^7.9.0",
     "docx": "^9.7.1",
     "entities": "^8.1.0",
+    "exceljs": "^4.4.0",
     "image-size": "^2.0.4",
+    "inline-style-parser": "^0.2.9",
     "marked": "^18.0.11",
+    "markmap-common": "^0.18.9",
+    "markmap-lib": "^0.18.12",
+    "markmap-view": "^0.18.12",
     "mermaid": "^11.17.2",
+    "proper-lockfile": "^4.1.2",
     "puppeteer-core": "^25.9.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
@@ -40,10 +50,15 @@
     "url": "https://github.com/CharlesYe8848/protoflow/issues"
   },
   "keywords": [
-    "mcp",
+    "cli",
     "prototype",
     "prd",
     "ai",
     "design"
-  ]
+  ],
+  "overrides": {
+    "exceljs": {
+      "uuid": "^11.1.1"
+    }
+  }
 }

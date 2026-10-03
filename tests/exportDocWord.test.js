@@ -5,10 +5,12 @@ import os from "node:os";
 import path from "node:path";
 import JSZip from "jszip";
 import * as store from "../core/store.js";
-import { createDoc, buildDoc } from "../core/doc.js";
-import { runProjectExport } from "../core/exportService.js";
-import { renderProjectView } from "../core/renderService.js";
-import { EXPORT_MENU } from "../core/exportMenu.js";
+import * as docStore from "../products/doc/store.js";
+import { createDoc, buildDoc } from "../products/doc/doc.js";
+import { runProjectExport } from "../products/index.js";
+import { renderProjectView } from "../products/index.js";
+import { DOC_EXPORT_MENU } from "../products/doc/exportMenu.js";
+import { tpl } from "./helpers/productDevTemplate.js";
 
 const ctx = { now: () => 1700000000000, genId: (p) => `${p}_1`, author: "Charles" };
 test("Word export: native content, embedded images, head only, and current menu on frozen previews", async (t) => {
@@ -16,9 +18,9 @@ test("Word export: native content, embedded images, head only, and current menu 
   t.after(() => fs.rmSync(ws, { recursive: true, force: true }));
   const project = store.createProject(ws, "招聘", ctx);
   const root = path.join(ws, project.id);
-  createDoc(ws, project.id, { kind: "prd", title: "招聘 PRD" }, ctx);
+  createDoc(ws, project.id, { docId: "prd", ...tpl("prd"), title: "招聘 PRD" }, ctx);
   assert.equal(await runProjectExport(root, "doc/prd/docx"), null);
-  const dir = store.docDir(ws, project.id, "prd");
+  const dir = docStore.docDir(ws, project.id, "prd");
   fs.writeFileSync(path.join(dir, "doc.md"), "# 招聘 PRD\n\n旧版内容");
   await buildDoc(ws, project.id, "prd", "finalize", { note: "初版" }, ctx);
   fs.writeFileSync(path.join(dir, "doc.md"), `# 招聘 PRD
@@ -73,13 +75,14 @@ graph TD; A-->B;
   assert.match(xml, /未嵌入/);
   assert.match(xml, /graph TD/);
   assert.match(xml, /更新/);
+  assert.match(xml, /初版/, "changelog 表带上历史版本（v1），不是只有当前这一版");
   assert.doesNotMatch(xml, /旧版内容|protoflow:changelog/);
   assert.match(await zip.file("word/_rels/document.xml.rels").async("string"), /https:\/\/example.com/);
   assert.match(await zip.file("word/numbering.xml").async("string"), /w:start w:val="3"/);
   const media = Object.keys(zip.files).filter((f) => f.startsWith("word/media/") && !zip.files[f].dir);
   assert.equal(media.length, 1);
   assert.deepEqual(await zip.file(media[0]).async("nodebuffer"), png);
-  assert.deepEqual(EXPORT_MENU.doc.map((f) => f.id), ["docx", "html", "markdown"]);
+  assert.deepEqual(DOC_EXPORT_MENU.map((f) => f.id), ["docx", "html", "markdown"]);
   const preview = path.join(dir, "preview.html");
   const frozen = fs.readFileSync(preview, "utf8");
   fs.writeFileSync(preview, frozen.replace('data-format="docx"', 'data-format="zip"').replace('<b>Word</b>', '<b>项目 HTML</b>'));
@@ -95,7 +98,7 @@ test("Word export: release-note template converts FAQ <br> tags to native line b
   t.after(() => fs.rmSync(ws, { recursive: true, force: true }));
   const project = store.createProject(ws, "招聘", ctx);
   const root = path.join(ws, project.id);
-  createDoc(ws, project.id, { kind: "release-note", title: "【招聘】推荐候选人卡片上线" }, ctx);
+  createDoc(ws, project.id, { docId: "release-note", ...tpl("release-note"), title: "【招聘】推荐候选人卡片上线" }, ctx);
   const built = await buildDoc(ws, project.id, "release-note", "finalize", { note: "首版" }, ctx);
   assert.equal(built.ok, true, JSON.stringify(built));
 

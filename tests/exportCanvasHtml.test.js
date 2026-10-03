@@ -4,8 +4,9 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import * as store from "../core/store.js";
-import { buildCanvasExportHtml } from "../core/exportCanvasHtml.js";
-import { runProjectExport } from "../core/exportService.js";
+import * as canvasStore from "../products/canvas/store.js";
+import { buildCanvasExportHtml } from "../products/canvas/exportCanvasHtml.js";
+import { runProjectExport } from "../products/index.js";
 
 const CTX = { now: () => 1700000000000, genId: (p) => `${p}_1`, author: "Charles" };
 let seq = 0;
@@ -14,9 +15,9 @@ function seqCtx() { return { now: () => 1700000000000 + (++seq), genId: (p) => `
 function setup(projectName = "招聘") {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "pf-expcvhtml-"));
   const proj = store.createProject(ws, projectName, CTX);
-  const pg = store.upsertPage(ws, proj.id, { name: "流程" }, CTX);
-  const ab = store.upsertArtboard(ws, proj.id, pg.id, { name: "列表页" }, CTX);
-  store.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <div id="l">列表 {1+1}</div>; }`);
+  const pg = canvasStore.upsertPage(ws, proj.id, { name: "流程" }, CTX);
+  const ab = canvasStore.upsertArtboard(ws, proj.id, pg.id, { name: "列表页" }, CTX);
+  canvasStore.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <div id="l">列表 {1+1}</div>; }`);
   return { ws, proj, pg, ab };
 }
 
@@ -33,6 +34,11 @@ test("exportCanvasHtml：不落盘到项目目录——只回 { filename, buffer
 
 test("exportCanvasHtml：画板 iframe 先留空（不是 srcdoc 属性），画板 HTML 连同 __PF_LIB__ 占位路径整体嵌成 JSON，库源码单独压缩嵌一份 JSON——画板自己的渲染（JSX + 浏览器端 Babel 编译）跟实时预览一致，只是库代码从哪儿来这一步变了", () => {
   const { ws, proj, ab } = setup();
+  const tree = canvasStore.loadProjectTree(ws, proj.id);
+  const assetsDir = path.join(ws, proj.id, "canvases", "main", "pages", tree.pages[0].id, "artboards", ab.id, "assets");
+  fs.mkdirSync(assetsDir, { recursive: true });
+  fs.writeFileSync(path.join(assetsDir, "shot.png"), "PNG_BYTES");
+  canvasStore.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <img id="l" src="assets/shot.png"/>; }`);
   const out = buildCanvasExportHtml(ws, proj.id);
   const html = out.buffer.toString("utf8");
 
@@ -43,7 +49,8 @@ test("exportCanvasHtml：画板 iframe 先留空（不是 srcdoc 属性），画
   const artboardHtmlEl = html.match(/<script type="application\/json" id="pf-artboard-html">([\s\S]*?)<\/script>/);
   assert.ok(artboardHtmlEl, "画板 HTML 整体嵌成一份 JSON");
   const artboardHtmlMap = JSON.parse(artboardHtmlEl[1]);
-  assert.ok(artboardHtmlMap[ab.id].includes("列表"), "画板正文内容在里面");
+  assert.ok(artboardHtmlMap[ab.id].includes('src="assets/shot.png"'), "画板 JSX 保留资产的逻辑路径");
+  assert.ok(artboardHtmlMap[ab.id].includes("data:image/png;base64,UE5HX0JZVEVT"), "单 HTML 把真实图片内联为 data URI");
   assert.ok(artboardHtmlMap[ab.id].includes('src="__PF_LIB__/react.production.min.js"'), "画板 HTML 里库的引用是占位路径，不是内联源码，也不是真实相对路径");
   assert.ok(artboardHtmlMap[ab.id].includes('data-presets="env,react"'), "画板自己的 <script type=text/babel> 原样保留（JSON 编码，不用手动转义属性值）");
 
@@ -60,8 +67,8 @@ test("exportCanvasHtml：库源码只压缩内联一份，不会跟着画板数�
   const { ws, proj, pg } = setup();
   const out1 = buildCanvasExportHtml(ws, proj.id);
 
-  const ab2 = store.upsertArtboard(ws, proj.id, pg.id, { name: "列表页2" }, seqCtx());
-  store.saveArtboardSource(ws, proj.id, ab2.id, `function Component(){ return <div id="l2">列表2 {2+2}</div>; }`);
+  const ab2 = canvasStore.upsertArtboard(ws, proj.id, pg.id, { name: "列表页2" }, seqCtx());
+  canvasStore.saveArtboardSource(ws, proj.id, ab2.id, `function Component(){ return <div id="l2">列表2 {2+2}</div>; }`);
   const out2 = buildCanvasExportHtml(ws, proj.id);
 
   // 每块画板除了正文，还各自带一份标注/尺寸上报/手势转发/取元素这几段脚本的样板代码（几 KB
@@ -78,8 +85,8 @@ test("exportCanvasHtml：没用到 mermaid 时不内联 mermaid（省掉 3.5MB�
   const libs1 = JSON.parse(out.buffer.toString("utf8").match(/id="pf-compressed-libs">([\s\S]*?)<\/script>/)[1]);
   assert.ok(!libs1["mermaid.min.js"], "没用到 mermaid 的项目，压缩库列表里不该有它");
 
-  const ab2 = store.upsertArtboard(ws, proj.id, pg.id, { name: "图表页" }, seqCtx());
-  store.saveArtboardSource(ws, proj.id, ab2.id, `function Component(){ return <div className="mermaid">graph TD; A-->B</div>; }`);
+  const ab2 = canvasStore.upsertArtboard(ws, proj.id, pg.id, { name: "图表页" }, seqCtx());
+  canvasStore.saveArtboardSource(ws, proj.id, ab2.id, `function Component(){ return <div className="mermaid">graph TD; A-->B</div>; }`);
   const out2 = buildCanvasExportHtml(ws, proj.id);
   const libs2 = JSON.parse(out2.buffer.toString("utf8").match(/id="pf-compressed-libs">([\s\S]*?)<\/script>/)[1]);
   assert.ok(libs2["mermaid.min.js"], "用到 mermaid 的画板，压缩库列表里该有它");
@@ -87,16 +94,16 @@ test("exportCanvasHtml：没用到 mermaid 时不内联 mermaid（省掉 3.5MB�
 
 test("exportCanvasHtml：无源码的画板不生成 srcdoc，画布外壳里显示空态", () => {
   const { ws, proj, pg } = setup();
-  store.upsertArtboard(ws, proj.id, pg.id, { name: "空画板" }, seqCtx());
+  canvasStore.upsertArtboard(ws, proj.id, pg.id, { name: "空画板" }, seqCtx());
   const out = buildCanvasExportHtml(ws, proj.id);
   const html = out.buffer.toString("utf8");
   assert.ok(html.includes("尚无内容"));
 });
 
-test("exportCanvasHtml：runProjectExport('canvas/html') 走这条路由，返回 { filename, buffer, mime }", () => {
+test("exportCanvasHtml：runProjectExport('canvas/<id>/html') 走这条路由，返回 { filename, buffer, mime }", () => {
   const { ws, proj } = setup();
   const projectRoot = path.join(ws, proj.id);
-  const routed = runProjectExport(projectRoot, "canvas/html");
+  const routed = runProjectExport(projectRoot, "canvas/main/html");
   assert.equal(routed.filename, "招聘.html");
   assert.equal(routed.mime, "text/html");
   assert.ok(Buffer.isBuffer(routed.buffer));

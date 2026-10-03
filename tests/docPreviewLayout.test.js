@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { renderDocPreviewHtml } from "../core/docPreview.js";
+import { renderDocPreviewHtml } from "../products/doc/docPreview.js";
 
 test("文档预览：宽表格限制在正文内，并保留横向滚动能力", () => {
   const html = renderDocPreviewHtml({

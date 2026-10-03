@@ -1,8 +1,8 @@
 <h1><img src="docs/images/protoflow-icon.svg" alt="" width="40" height="40" align="absmiddle"> ProtoFlow</h1>
 
-**描述需求，画出原型，交付 PRD。**
+**描述需求，画出原型，整理数据，交付文档与演示。**
 
-配合 Claude Code、Cursor、Codex 等 AI 助手，用对话制作可交互原型、添加元素标注和生成需求文档。原型改了，还能检查哪些标注和文档需要更新。
+配合 Claude Code、Cursor、Codex 等 AI 助手，用对话制作可交互原型、添加元素标注、生成需求文档、结构化表格和幻灯片。内容改了，还能检查哪些引用和交付物需要更新。
 
 ![ProtoFlow：购物车原型与元素标注](docs/images/checkout-canvas.png)
 
@@ -22,77 +22,54 @@ npm ci
 
 想先看效果？运行 `npm run demo`，打开终端输出的原型、PRD 和上线公告链接，无需连接 AI。
 
-### 安装场景技能
+### 安装技能
 
-将仓库中的 [`skills/protoflow`](skills/protoflow/SKILL.md) 文件夹安装到助手的技能目录。
-这是 ProtoFlow 唯一的主 Skill，覆盖创建和修改原型、元素标注、交付文档、预览与导出等场景，
-让助手能在“做可点击原型”“根据原型整理评审文档”等请求中主动选择 ProtoFlow。
-主 Skill 负责场景选择，下面的 MCP 或 CLI 提供实际工具；两者都需要可用。
+仓库的 [`skills/`](skills/) 下有三个标准 skill，都装到助手的技能目录：
 
-Codex 用户可在本仓库根目录执行以下命令（自定义 `CODEX_HOME` 时使用对应目录）：
+| skill | 作用 |
+| --- | --- |
+| [`protoflow`](skills/protoflow/SKILL.md) | 入口：让助手在"做可点击原型""做个数据表格"等请求中主动选择 ProtoFlow，并按交付物路由 |
+| [`protoflow-product-dev`](skills/protoflow-product-dev/SKILL.md) | 产品研发流程：基于原型写 PRD、上线公告，截原型图、发布前检查、看文档是否落后于原型 |
+| [`protoflow-slides`](skills/protoflow-slides/SKILL.md) | 幻灯片创作流程：内容策划、视觉设计、逐页检查，并支持表格、绘图、音视频与多格式导出 |
 
-```bash
-mkdir -p "${CODEX_HOME:-$HOME/.codex}/skills"
-if [ ! -e "${CODEX_HOME:-$HOME/.codex}/skills/protoflow" ]; then
-  cp -R skills/protoflow "${CODEX_HOME:-$HOME/.codex}/skills/protoflow"
-else
-  echo "ProtoFlow 技能已存在，请先比较内容，再决定是否替换。"
-fi
-```
+skill 负责场景选择和流程，下面的 `protoflow` 命令行工具（CLI）提供实际操作；两者都需要可用。
 
-其他助手通过其技能安装入口添加同一个文件夹。安装后重新打开会话，确认技能目录中出现
-`protoflow`。技能不含运行时，也不会自动安装依赖或修改 MCP 配置。
-
-### 连接工具
-
-通过 MCP（让 AI 调用外部工具的接口）接入。选择你使用的助手，将 `/path/to/protoflow` 替换为 ProtoFlow 文件夹的**绝对路径**：
-
-<details>
-<summary><strong>Claude Code</strong></summary>
-
-在终端执行：
+推荐用软链接安装（仓库更新后 skill 跟着更新）。Claude Code 用 `~/.claude/skills`，Codex 用
+`${CODEX_HOME:-$HOME/.codex}/skills`；在本仓库根目录执行：
 
 ```bash
-claude mcp add protoflow -- node /path/to/protoflow/mcp/server.js
+SKILLS_DIR="$HOME/.claude/skills"   # Codex：SKILLS_DIR="${CODEX_HOME:-$HOME/.codex}/skills"
+mkdir -p "$SKILLS_DIR"
+for s in protoflow protoflow-product-dev protoflow-slides; do
+  if [ -e "$SKILLS_DIR/$s" ]; then echo "$s 已存在，请先比较内容，再决定是否替换。"
+  else ln -s "$PWD/skills/$s" "$SKILLS_DIR/$s"; fi
+done
 ```
 
-</details>
+也可以拷贝（`cp -R`）。拷贝后流程 skill 的脚本不在仓库里，会去 PATH 上找 `protoflow` 命令，或者用
+环境变量 `PROTOFLOW_CLI=/path/to/protoflow/bin/protoflow-cli.js` 指定。安装后重新打开会话。技能不含
+运行时，也不会自动安装依赖。
 
-<details>
-<summary><strong>Cursor</strong></summary>
+### 安装命令行工具
 
-在 `~/.cursor/mcp.json` 中添加以下配置；如果已有其他工具，保留它们，把 `protoflow` 加入现有的 `mcpServers`：
+助手通过 `protoflow` 命令操作 ProtoFlow（不需要配置 MCP）。在本仓库根目录执行一次：
 
-```json
-{
-  "mcpServers": {
-    "protoflow": {
-      "command": "node",
-      "args": ["/path/to/protoflow/mcp/server.js"]
-    }
-  }
-}
+```bash
+npm link                  # 装一个全局的 protoflow 命令，指向这个仓库（仓库更新后命令跟着更新）
+protoflow --selfcheck     # 输出工具数量即安装成功
+protoflow --help          # 每个工具一行；protoflow help <工具> 看参数
 ```
 
-</details>
-
-<details>
-<summary><strong>Codex</strong></summary>
-
-在 `~/.codex/config.toml` 中添加：
-
-```toml
-[mcp_servers.protoflow]
-command = "node"
-args = ["/path/to/protoflow/mcp/server.js"]
-```
-
-</details>
-
-配置后重新打开助手会话，确认 ProtoFlow 技能和工具均已加载。
-连接诊断与 CLI 备用方式见[使用说明](docs/usage.md#技能与工具连接检查)。
+不想装全局命令也可以直接用 `node /path/to/protoflow/bin/protoflow-cli.js`，在跟助手对话时告诉它仓库路径即可。
+重新打开助手会话，确认 ProtoFlow 技能已加载。连接诊断见[使用说明](docs/usage.md#技能与工具连接检查)。
 
 ## 试着这样说
+
+**先梳理思路**
+
+> 做原型之前，先把会员体系的需求拆成一张脑图，再画一张下单流程图给我看。
+
+打开链接看图，对着节点右键「标注」写意见，复制给 AI 就能接着改。
 
 **创建原型**
 
@@ -108,6 +85,14 @@ args = ["/path/to/protoflow/mcp/server.js"]
 
 打开链接就能试用原型；修改后刷新即可查看。检查会提示需要更新的内容，你可以继续让 AI 核对标注、更新截图并保存新的文档版本。
 
+**整理数据并导出 Excel**
+
+> 把这份季度销售数据整理成带汇总和样式的表格，给我预览，确认后导出 Excel。
+
+**制作绘图与幻灯片**
+
+> 先用流程图梳理新用户激活路径，再把关键结论和数据表做成一份评审幻灯片，导出 PDF。
+
 ## 为什么用 ProtoFlow
 
 **原型改了以后，知道哪些标注、文档和已发布内容需要跟着改。**
@@ -118,7 +103,7 @@ ProtoFlow 把原型、元素标注、截图和文档关联起来，让一次交�
 | --- | --- |
 | 交互规则散在对话和文档里 | 标注绑定页面元素，点击说明即可定位 |
 | 原型修改后，靠记忆核对文档 | 发起检查，发现待核对的标注、过期文档和待更新的已发布内容 |
-| 多轮修改后，难以确认交付版本 | 保存 PRD、上线公告的版本、修改记录和发布记录 |
+| 多轮修改后，难以确认交付版本 | 保存画布、文档、表格、绘图和幻灯片的不可变版本与修改记录 |
 | 换一个 AI 或新会话继续做 | 项目保存在本地文件夹，保留原型、标注和文档供继续编辑 |
 
 适合需要持续修改原型、交付研发并同步业务团队的项目。发布到钉钉等平台需配合相应的 AI 助手工具，详见[使用说明](docs/usage.md)。
@@ -143,7 +128,7 @@ ProtoFlow 把原型、元素标注、截图和文档关联起来，让一次交�
 
 > 把原型导出成一个可直接打开的 HTML 文件，再把 PRD 导出为 Markdown。
 
-画布支持项目 ZIP 和单页 HTML；文档支持 Word、单页 HTML 和带图片的 Markdown 压缩包。
+画布支持项目 ZIP 和单页 HTML；文档支持 Word、单页 HTML 和带图片的 Markdown 压缩包；表格支持 Excel；绘图支持单页 HTML 和源文件压缩包；幻灯片支持 PDF、MP4、单页 HTML 和源文件压缩包。
 把导出的文件发给同事即可；本地预览链接仅在你的电脑上有效。
 
 ## 更多
@@ -152,4 +137,4 @@ ProtoFlow 把原型、元素标注、截图和文档关联起来，让一次交�
 - [使用说明与常见问题](docs/usage.md)：项目保存、截图、系统支持和平台发布。
 - [问题反馈](https://github.com/CharlesYe8848/protoflow/issues) · [安全说明](SECURITY.md)
 
-[MIT](LICENSE) · v0.1.0 预览版
+[MIT](LICENSE) · v0.2.0 预览版

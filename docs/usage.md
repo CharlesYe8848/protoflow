@@ -51,19 +51,19 @@ ProtoFlow 本身不需要。生成和修改内容使用你已经在 AI 助手中
 
 ## 技能与工具连接检查
 
-场景入口在 `skills/protoflow/SKILL.md`；安装技能后仍需要连接 MCP 或提供本地 CLI。
+场景入口在 `skills/protoflow/SKILL.md`；安装技能后还需要能运行 `protoflow` 命令行工具（CLI）。
 以下检查分开进行，命令成功不代表助手当前会话已经加载技能：
 
 1. **技能发现**：重新打开助手会话，在可用技能列表中确认 `protoflow`。仅把仓库下载到磁盘不等于安装技能。
-2. **运行时**：在仓库根目录执行 `npm run selfcheck`，验证 MCP/CLI 入口可启动。
-3. **指南读取**：执行 `node bin/protoflow-cli.js get_guide '{"topic":"workflow"}'`，应返回场景指南。
-4. **MCP 连接**：在助手中显式要求“用 ProtoFlow 读取工作流指南”，确认实际调用成功。CLI 自检不能替代这一步。
+2. **运行时**：在仓库根目录执行 `npm run selfcheck`，验证 CLI 可启动；装了全局命令的执行 `protoflow --selfcheck`。
+3. **指南读取**：执行 `protoflow get_guide --topic workflow`，应返回场景指南。
+4. **助手能调用**：在助手中显式要求“用 ProtoFlow 读取工作流指南”，确认它实际执行了 `protoflow` 命令。CLI 自检不能替代这一步。
 5. **隐式命中**：在另一个新会话中说“做一个可点击的报销审批原型”，观察是否主动选择 ProtoFlow；这个验证会创建原型，请使用临时工作目录。
 
-没有 MCP 时，可以告诉助手仓库的绝对路径，通过 `node /实际仓库路径/bin/protoflow-cli.js` 使用相同工具。
-CLI 的第二个参数是 JSON，参数定义位于 `mcp/tools.js` 的对应 schema。不要假定安装了 Skill 就存在全局 `protoflow` 命令。
+没装全局命令时，可以告诉助手仓库的绝对路径，通过 `node /实际仓库路径/bin/protoflow-cli.js` 使用相同工具。
+参数写成 `--参数 值`，`protoflow help <工具>` 列出每个工具的参数（定义在 `cli/tools.js`）。不要假定安装了 Skill 就存在全局 `protoflow` 命令。
 
-已有项目传 `projectId`（项目文件夹名）和 `dir`（父目录）；相对路径容易受助手启动位置影响，推荐绝对父目录。
+已有项目传 `--projectId`（项目文件夹名）和 `--dir`（父目录），或者直接用 `--url <预览页地址>`；相对路径容易受助手启动位置影响，推荐绝对父目录。
 项目找不到时先核对位置，不重新创建同名项目。更新技能需要重新复制已检查的内容并重新打开会话；本版没有自动更新器。
 
 用于对比改造前后表现的场景和记录方式见[技能场景评测](skill-evaluation.md)。

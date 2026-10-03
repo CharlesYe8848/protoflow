@@ -1,0 +1,268 @@
+/* 商务版式（mono、swiss 两个样例共用同一套版式名和类名，写法见 examples/LAYOUTS.md）：汇报、评审、发布类幻灯片的网格、
+   位置、间距、组件结构。颜色、字重、圆角这些"长什么样"都走变量，由 swiss.css 和 theme.css 给值。
+   图标、图表、截图外框、动效关键帧在 pf-kit.css / pf-kit.js。 */
+:root{
+  /* 颜色、字体的默认值在运行时 runtime.css；这里是这套版式自己用的字号、字重、形状 */
+  --t-display:144px; --t-h1:112px; --t-h2:80px; --t-h3:52px; --t-body:44px; --t-small:34px; --t-caption:28px;
+  --w-display:800; --w-title:800; --w-h3:700; --w-strong:800; --w-body:400;
+  --track-display:-.02em; --track-title:-.01em;
+  /* 形状 */
+  --r-lg:28px; --r-md:24px; --r-sm:16px; --r-pill:999px;
+  --rule:2px; --panel-bg:var(--tint); --panel-border:0 solid transparent;
+  --bullet-size:20px; --bullet-radius:0; --dot-radius:50%;
+  --pad-x:136px; --pad-y:112px;
+}
+
+/* ---- 基础 ---- */
+section{position:relative;background:var(--paper);color:var(--ink);font-family:var(--font);font-size:var(--t-body);font-weight:var(--w-body);line-height:1.45;
+  padding:var(--pad-y) var(--pad-x);display:flex;flex-direction:column;gap:56px;-webkit-font-smoothing:antialiased}
+section h1,section h2,section h3,section p,section ul,section ol,section figure,section blockquote{margin:0}
+/* 标题优先在标点、空格处折行（中文按字折会把词拆开）；实在放不下由 runtime.js 退回按字折 */
+section h1,section h2,section blockquote{font-family:var(--font-display);text-wrap:balance;word-break:keep-all}
+section h1{font-size:var(--t-h1);line-height:1.08;font-weight:var(--w-display);letter-spacing:var(--track-display)}
+section h2{font-size:var(--t-h2);line-height:1.15;font-weight:var(--w-title);letter-spacing:var(--track-title)}
+section h3{font-size:var(--t-h3);line-height:1.25;font-weight:var(--w-h3)}
+section p{color:var(--ink-2);text-wrap:pretty}
+section strong{font-weight:var(--w-strong)}
+section em{font-style:normal;color:var(--accent)}
+section ul,section ol{padding-left:0;list-style:none;display:flex;flex-direction:column;gap:28px}
+section ul>li{position:relative;padding-left:52px}
+section ul>li::before{content:"";position:absolute;left:0;top:.5em;width:var(--bullet-size);height:var(--bullet-size);border-radius:var(--bullet-radius);background:var(--accent)}
+section img{display:block;max-width:100%;max-height:100%;object-fit:cover}
+section code{font-family:var(--mono);font-size:.85em;background:var(--tint);padding:2px 10px;border-radius:6px}
+section table{border-collapse:collapse;font-size:var(--t-small)}
+section th,section td{border-bottom:var(--rule) solid var(--line);padding:18px 28px;text-align:left}
+/* 嵌入的表格：去掉表格产品自带的格线，换成这套的横线样式 */
+section .pf-embed-slot td,section .pf-embed-slot th{border:0!important;border-bottom:var(--rule) solid var(--line)!important;padding:18px 32px!important}
+section .pf-embed-slot tr:first-child td{color:var(--muted);font-weight:600}
+
+/* 通用小件 */
+section .kicker{font-size:var(--t-caption);font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+section .lead{font-size:var(--t-small);line-height:1.5;color:var(--muted);max-width:1400px}
+section .note,section .caption{font-size:var(--t-caption);color:var(--muted)}
+section .head{display:flex;flex-direction:column;gap:20px}
+section .body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center}
+section .foot{margin-top:auto;display:flex;justify-content:space-between;font-size:var(--t-caption);color:var(--faint);border-top:var(--rule) solid var(--line);padding-top:24px}
+/* 带底色的方块图标 */
+section .icon-badge{display:inline-flex;align-items:center;justify-content:center;width:112px;height:112px;border-radius:var(--r-md);background:var(--accent-tint);color:var(--accent);font-size:60px;flex:none}
+
+
+/* ---- 节奏：任何版式都可以加 is-dark（深色）或 is-accent（强调色）---- */
+section.is-dark{background:var(--dark);color:#fff;--ink:#fff;--line:rgba(255,255,255,.18);--chart-soft:rgba(255,255,255,.28);--muted:#94a3b8;--ink-2:#cbd5e1;--tint:rgba(255,255,255,.08);--accent-tint:rgba(255,255,255,.1);--panel-bg:rgba(255,255,255,.06)}
+/* 强调色页：背景用强调色，页里原来用强调色标焦点的地方（em、kicker、图表高亮、方块）改成反白 */
+section.is-accent{background:var(--accent);color:var(--accent-ink);--ink:var(--accent-ink);--ink-2:var(--accent-ink);--muted:var(--accent-ink);--line:rgba(255,255,255,.3);--chart-soft:rgba(255,255,255,.35);--tint:rgba(255,255,255,.12);--accent-tint:rgba(255,255,255,.16);--panel-bg:rgba(255,255,255,.12)}
+section.is-accent em,section.is-accent .kicker{color:var(--accent-ink)}
+section.is-accent ul>li::before{background:var(--accent-ink)}
+section.is-accent .chart{--accent:var(--accent-ink)}
+section.is-accent .icon-badge{color:var(--accent-ink)}
+
+/* ---- 封面 ---- */
+section[data-layout="cover"]{justify-content:flex-end;gap:40px;padding-bottom:120px}
+section[data-layout="cover"] h1{font-size:var(--t-display);max-width:1500px;position:relative}
+section[data-layout="cover"] .sub{font-size:var(--t-body);color:var(--ink-2);max-width:1400px;position:relative}
+section[data-layout="cover"] .meta{display:flex;gap:48px;font-size:var(--t-caption);color:var(--muted);border-top:3px solid var(--ink);padding-top:28px;margin-top:24px;position:relative}
+section[data-layout="cover"] .kicker{position:relative}
+
+/* ---- 封面（左右分割）：左文字、右强调色块或图 ---- */
+section[data-layout="cover-split"]{padding:0;display:grid;grid-template-columns:1.15fr .85fr}
+section[data-layout="cover-split"]>.text{padding:var(--pad-y) 112px var(--pad-y) var(--pad-x);display:flex;flex-direction:column;justify-content:flex-end;gap:40px}
+section[data-layout="cover-split"] h1{font-size:128px}
+section[data-layout="cover-split"] .sub{font-size:var(--t-body);color:var(--ink-2)}
+section[data-layout="cover-split"] .meta{font-size:var(--t-caption);color:var(--muted)}
+section[data-layout="cover-split"]>figure{position:relative;background:var(--accent);color:var(--accent-ink);display:flex;align-items:center;justify-content:center;overflow:hidden;font-size:360px}
+section[data-layout="cover-split"]>figure img{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover}
+
+/* ---- 目录 ---- */
+section[data-layout="agenda"]{display:grid;grid-template-columns:.8fr 1.2fr;gap:96px;align-items:center}
+section[data-layout="agenda"] ol{counter-reset:ag;gap:0}
+section[data-layout="agenda"] ol>li{counter-increment:ag;display:flex;align-items:baseline;gap:40px;padding:30px 0;border-bottom:var(--rule) solid var(--line);font-size:var(--t-h3);font-weight:var(--w-h3)}
+section[data-layout="agenda"] ol>li::before{content:counter(ag,decimal-leading-zero);font-family:var(--mono);font-size:var(--t-small);color:var(--accent);font-weight:600}
+section[data-layout="agenda"] ol>li span{display:block;font-size:var(--t-caption);font-weight:400;color:var(--muted);margin-top:6px}
+
+/* ---- 章节页：深色 ---- */
+section[data-layout="section"]{background:var(--dark);color:#fff;justify-content:flex-end;padding-bottom:144px;--ink:#fff;--muted:#94a3b8;--line:rgba(255,255,255,.18)}
+section[data-layout="section"] .num{font-family:var(--mono);font-size:200px;line-height:1;font-weight:700;color:var(--accent);margin-bottom:24px}
+section[data-layout="section"] h2{font-size:var(--t-h1);color:#fff}
+section[data-layout="section"] p{color:#cbd5e1;font-size:var(--t-body);max-width:1300px}
+
+/* ---- 一句话观点 ---- */
+section[data-layout="statement"]{justify-content:center}
+section[data-layout="statement"] h2{font-size:112px;line-height:1.2;max-width:1640px}
+
+/* ---- 要点 ---- */
+section[data-layout="bullets"] ul{flex:1;justify-content:center;font-size:52px;gap:44px;max-width:1560px}
+
+/* ---- 图标网格：3 / 4 / 6 项，每项一个图标 ---- */
+section[data-layout="icon-grid"] .items{flex:1;display:grid;grid-template-columns:repeat(3,1fr);gap:64px 80px;align-content:center}
+section[data-layout="icon-grid"] .items:not(.is-6) .icon-badge{width:160px;height:160px;border-radius:var(--r-lg);font-size:88px;margin-bottom:16px}
+section[data-layout="icon-grid"] .items.is-4{grid-template-columns:repeat(4,1fr);gap:56px}
+section[data-layout="icon-grid"] .item{display:flex;flex-direction:column;gap:24px}
+section[data-layout="icon-grid"] .item h3{font-size:60px}
+section[data-layout="icon-grid"] .item p{font-size:38px;line-height:1.45}
+section[data-layout="icon-grid"] .items.is-6{gap:96px 64px}
+section[data-layout="icon-grid"] .items.is-6 .icon-badge{width:128px;height:128px;border-radius:var(--r-md);font-size:68px}
+section[data-layout="icon-grid"] .items.is-6 .item{flex-direction:row;align-items:center;gap:36px}
+section[data-layout="icon-grid"] .items.is-6 .item h3{font-size:52px}
+section[data-layout="icon-grid"] .items.is-6 .item p{font-size:36px;margin-top:8px}
+
+/* ---- 两栏 ---- */
+section[data-layout="two-cols"] .cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:112px;align-content:center}
+section[data-layout="two-cols"] .cols>*{display:flex;flex-direction:column;gap:32px;min-width:0}
+section[data-layout="two-cols"] .cols h3{font-size:var(--t-h3);display:flex;align-items:center;gap:24px}
+section[data-layout="two-cols"] .cols ul{font-size:var(--t-body)}
+
+/* ---- 图文：一半图、一半文字 ---- */
+section[data-layout="image-left"],section[data-layout="image-right"]{padding:0;display:grid;grid-template-columns:1fr 1fr;gap:0}
+section[data-layout="image-left"]>figure,section[data-layout="image-right"]>figure{position:relative;height:1080px;background:var(--tint);overflow:hidden;display:flex;align-items:center;justify-content:center}
+section[data-layout="image-left"]>figure>img,section[data-layout="image-right"]>figure>img{width:100%;height:100%;max-height:none;object-fit:cover}
+section[data-layout="image-left"]>figure.contain>img,section[data-layout="image-right"]>figure.contain>img{object-fit:contain;padding:72px}
+section[data-layout="image-left"]>figure>.frame-phone,section[data-layout="image-right"]>figure>.frame-phone{height:880px}
+section[data-layout="image-left"]>figure>.frame-browser,section[data-layout="image-right"]>figure>.frame-browser{width:840px}
+section[data-layout="image-right"]>figure{order:2}
+section[data-layout="image-left"]>.text,section[data-layout="image-right"]>.text{padding:var(--pad-y) 120px;display:flex;flex-direction:column;justify-content:center;gap:40px;min-width:0}
+section[data-layout="image-left"] .text p,section[data-layout="image-right"] .text p{font-size:var(--t-body)}
+
+/* ---- 满版图 + 标题 ---- */
+section[data-layout="image-full"]{padding:0;justify-content:flex-end;color:#fff}
+section[data-layout="image-full"]>img.bg{position:absolute;inset:0;width:100%;height:100%;max-height:none;object-fit:cover}
+section[data-layout="image-full"]>.text{position:relative;padding:112px var(--pad-x);display:flex;flex-direction:column;gap:24px;
+  background:linear-gradient(to top,rgba(15,23,42,.9),rgba(15,23,42,0))}
+section[data-layout="image-full"] h2{color:#fff;font-size:var(--t-h1)}
+section[data-layout="image-full"] p{color:#e2e8f0;font-size:var(--t-body)}
+
+/* ---- 图片网格：2 / 3 / 4 张，每张一行说明 ---- */
+section[data-layout="image-grid"] .grid{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);gap:40px}
+section[data-layout="image-grid"] .grid.is-2{grid-template-columns:repeat(2,1fr)}
+section[data-layout="image-grid"] .grid.is-4{grid-template-columns:repeat(4,1fr)}
+section[data-layout="image-grid"] figure{display:flex;flex-direction:column;gap:20px;min-height:0}
+section[data-layout="image-grid"] figure>img{flex:1;min-height:0;width:100%;object-fit:cover;background:var(--tint);border-radius:var(--r-sm)}
+section[data-layout="image-grid"] figure.contain>img{object-fit:contain;padding:24px}
+section[data-layout="image-grid"] figure>.frame-phone,section[data-layout="image-grid"] figure>.frame-browser{flex:1;min-height:0;max-height:none}
+section[data-layout="image-grid"] figcaption{font-size:var(--t-small);font-weight:600}
+
+/* ---- 数据指标：2–4 个，可带进度条 ---- */
+section[data-layout="metrics"] .metrics{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:72px;align-content:center}
+section[data-layout="metrics"] .metric{display:flex;flex-direction:column;gap:20px}
+section[data-layout="metrics"] .metric strong{font-family:var(--font-display);font-size:160px;line-height:1;font-weight:var(--w-display);letter-spacing:-.03em}
+section[data-layout="metrics"] .metric.is-key strong{color:var(--accent)}
+section[data-layout="metrics"] .metric span{font-size:var(--t-small);color:var(--muted)}
+section[data-layout="metrics"] .metric .chart{height:24px;min-height:0;margin-top:8px}
+
+/* ---- 大数字：一个关键数字 + 解释（可带一张小图表）---- */
+section[data-layout="big-number"]{display:grid;grid-template-columns:1fr 1fr;gap:112px;align-items:center}
+section[data-layout="big-number"] .number{font-family:var(--font-display);font-size:340px;line-height:.9;font-weight:var(--w-display);letter-spacing:-.04em;color:var(--accent)}
+section[data-layout="big-number"] .number small{font-size:.35em;letter-spacing:0;margin-left:12px}
+section[data-layout="big-number"] .text{display:flex;flex-direction:column;gap:36px}
+section[data-layout="big-number"] .text .chart{height:320px}
+
+/* ---- 图表：左结论、右图表 ---- */
+section[data-layout="chart"]{display:grid;grid-template-columns:.78fr 1.22fr;gap:112px;align-items:stretch}
+section[data-layout="chart"]>.text{display:flex;flex-direction:column;justify-content:center;gap:36px}
+section[data-layout="chart"]>.text h2{font-size:72px}
+section[data-layout="chart"]>.text p{font-size:var(--t-small)}
+section[data-layout="chart"]>.chart,section[data-layout="chart"]>.figure{min-height:0;height:100%}
+section[data-layout="chart"]>.figure{display:flex;align-items:center;justify-content:center}
+
+/* ---- 对比 ---- */
+section[data-layout="compare"] .compare{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:40px}
+section[data-layout="compare"] .col{padding:64px 64px;display:flex;flex-direction:column;gap:36px;background:var(--panel-bg);border:var(--panel-border);border-radius:var(--r-lg)}
+section[data-layout="compare"] .col.is-highlight{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+section[data-layout="compare"] .col.is-highlight h3,section[data-layout="compare"] .col.is-highlight li,section[data-layout="compare"] .col.is-highlight strong{color:var(--accent-ink)}
+section[data-layout="compare"] .col.is-highlight ul>li::before{background:var(--accent-ink)}
+section[data-layout="compare"] .col h3{font-size:56px}
+section[data-layout="compare"] .col ul{font-size:var(--t-body)}
+section[data-layout="compare"] .col .tag{align-self:flex-start;font-size:var(--t-caption);font-weight:700;padding:8px 20px;border-radius:var(--r-pill);background:var(--accent-ink);color:var(--accent)}
+
+/* ---- 卡片：3 / 4 / 6 张 ---- */
+section[data-layout="cards"] .cards{flex:1;min-height:0;display:grid;grid-template-columns:repeat(3,1fr);gap:40px;align-content:center}
+section[data-layout="cards"] .cards.is-4{grid-template-columns:repeat(4,1fr)}
+section[data-layout="cards"] .cards.is-6{grid-template-columns:repeat(3,1fr)}
+section[data-layout="cards"] .card{background:var(--panel-bg);border:var(--panel-border);border-radius:var(--r-lg);padding:56px 52px;display:flex;flex-direction:column;gap:24px;min-height:480px}
+section[data-layout="cards"] .card.is-highlight{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+section[data-layout="cards"] .card.is-highlight h3,section[data-layout="cards"] .card.is-highlight p{color:var(--accent-ink)}
+section[data-layout="cards"] .card .idx{font-family:var(--mono);font-size:var(--t-small);color:var(--accent);font-weight:700;margin-bottom:48px}
+section[data-layout="cards"] .card.is-highlight .idx{color:var(--accent-ink)}
+section[data-layout="cards"] .card .icon-badge{margin-bottom:24px}
+section[data-layout="cards"] .card.is-highlight .icon-badge{background:rgba(255,255,255,.18);color:var(--accent-ink)}
+section[data-layout="cards"] .card h3{font-size:56px}
+section[data-layout="cards"] .card p{font-size:var(--t-small)}
+section[data-layout="cards"] .cards.is-6 .card{padding:40px 44px;gap:14px;min-height:0}
+section[data-layout="cards"] .cards.is-6 .card .idx{margin-bottom:12px}
+section[data-layout="cards"] .cards.is-6 .card h3{font-size:44px}
+section[data-layout="cards"] .cards.is-6 .card p{font-size:30px}
+
+/* ---- 时间线：3–5 步；当前这步加 is-now ---- */
+section[data-layout="timeline"] ol.timeline{flex:1;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:0;align-content:center}
+section[data-layout="timeline"] ol.timeline>li{position:relative;display:flex;flex-direction:column;gap:18px;padding:72px 48px 0 0;border-top:6px solid var(--line)}
+section[data-layout="timeline"] ol.timeline>li:last-child{border-image:linear-gradient(to right,var(--line) 40px,transparent 40px) 1}
+section[data-layout="timeline"] ol.timeline>li::before{content:"";position:absolute;left:0;top:-25px;width:32px;height:32px;border-radius:var(--dot-radius);background:var(--ink);border:8px solid var(--paper);box-sizing:content-box;transform:translateX(-8px)}
+section[data-layout="timeline"] ol.timeline>li.is-now::before{background:var(--accent);width:44px;height:44px;top:-31px}
+section[data-layout="timeline"] ol.timeline strong{font-size:var(--t-small);color:var(--muted);font-weight:600}
+section[data-layout="timeline"] ol.timeline li.is-now strong{color:var(--accent)}
+section[data-layout="timeline"] ol.timeline span{font-size:56px;font-weight:var(--w-title);line-height:1.2}
+section[data-layout="timeline"] ol.timeline p{font-size:32px}
+
+/* ---- 流程：纯 HTML 的步骤卡片 + 箭头（.flow 也能放进别的版式里）---- */
+section[data-layout="process"] .flow{flex:1}
+section .flow{counter-reset:step;list-style:none;padding:0;margin:0;display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:88px;align-content:center;align-items:stretch}
+section .flow>li{counter-increment:step;position:relative;display:flex;flex-direction:column;gap:24px;padding:52px 40px;background:var(--panel-bg);border:var(--panel-border);border-radius:var(--r-lg);min-height:480px}
+section .flow>li::before{content:counter(step,decimal-leading-zero);font-family:var(--mono);font-size:var(--t-caption);font-weight:700;color:var(--accent);margin-bottom:8px}
+section .flow>li:not(:last-child)::after{content:"";position:absolute;top:50%;right:-68px;width:48px;height:48px;transform:translateY(-50%);
+  background:var(--ink);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h15M13 6l6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat;
+  mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 12h15M13 6l6 6-6 6'/%3E%3C/svg%3E") center/contain no-repeat;opacity:.35}
+section .flow>li .icon-badge{width:128px;height:128px;font-size:68px;background:var(--paper);margin-bottom:auto}
+section .flow>li b{font-size:50px;line-height:1.2;font-weight:var(--w-title)}
+section .flow>li span:not(.icon-badge){font-size:32px;line-height:1.4;color:var(--ink-2)}
+section .flow>li.is-key{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+section .flow>li.is-key::before,section .flow>li.is-key b,section .flow>li.is-key span:not(.icon-badge){color:var(--accent-ink)}
+section .flow>li.is-key .icon-badge{background:rgba(255,255,255,.18);color:var(--accent-ink)}
+section .flow.is-vertical{grid-auto-flow:row;grid-auto-rows:auto;gap:56px}
+section .flow.is-vertical>li{flex-direction:row;align-items:center;min-height:0;padding:32px 40px;gap:32px}
+section .flow.is-vertical>li .icon-badge{width:96px;height:96px;font-size:52px;margin-bottom:0}
+section .flow.is-vertical>li::before{margin:0}
+section .flow.is-vertical>li:not(:last-child)::after{top:auto;right:auto;left:50%;bottom:-54px;transform:translateX(-50%) rotate(90deg);width:40px;height:40px}
+section .flow.is-vertical>li b{font-size:40px}
+
+/* ---- 图表 / 嵌入 / 复杂流程图：标题 + 一大块内容区 ---- */
+section[data-layout="figure"] .figure{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;overflow:hidden}
+section[data-layout="figure"] .figure>*{max-width:100%;max-height:100%}
+section[data-layout="figure"] .figure .pf-embed-slot{display:flex;justify-content:center;width:100%;max-height:100%}
+section[data-layout="figure"] .figure table{width:auto;min-width:64%;font-size:var(--t-body)}
+section[data-layout="figure"] .figure .mermaid,section[data-layout="figure"] .figure .chart{height:100%}
+
+/* ---- 引言 ---- */
+section[data-layout="quote"]{justify-content:center;gap:48px}
+section[data-layout="quote"] blockquote{position:relative;font-family:var(--font-display);font-size:88px;line-height:1.3;font-weight:var(--w-title);max-width:1560px;text-wrap:balance}
+section[data-layout="quote"] cite{font-style:normal;font-size:var(--t-small);color:var(--muted)}
+
+/* ---- 结束页 ---- */
+section[data-layout="end"]{justify-content:center;align-items:flex-start}
+section[data-layout="end"] h2{font-size:var(--t-display)}
+section[data-layout="end"] p{font-size:var(--t-body);color:var(--muted)}
+
+/* ---- 动效编排（关键帧、图表动效、不动的场合在运行时 runtime.css）----
+   编排：先文字（标题、说明）→ 再主体（卡片、步骤、指标一张张出来；图表各按自己的方式长出来）→ 最后数字标签淡入。
+   时间都在 1.2 秒内收尾，不抢讲的人的节奏。 */
+/* 文字：页里的直接子元素（标题块、说明）由下往上淡入 */
+.pf-slide.active>section>*{animation:pf-rise .55s var(--ease) both}
+.pf-slide.active>section>*:nth-child(2){animation-delay:.06s}
+.pf-slide.active>section>*:nth-child(n+3){animation-delay:.12s}
+/* 主体：并列的东西一个一个出来 */
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>*{animation:pf-rise .5s var(--ease) both;animation-delay:var(--d,.2s)}
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>:nth-child(1){--d:.2s}
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>:nth-child(2){--d:.32s}
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>:nth-child(3){--d:.44s}
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>:nth-child(4){--d:.56s}
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>:nth-child(5){--d:.68s}
+.pf-slide.active section :is(.cards,.items,.metrics,.compare,.grid,.flow,ol.timeline,ul,ol)>:nth-child(n+6){--d:.8s}
+/* 流程：箭头跟在它前面那一步后面出来；时间线：点弹出 */
+.pf-slide.active section .flow>li:not(:last-child)::after{animation:pf-fade .3s ease-out both;animation-delay:calc(var(--d) + .25s)}
+/* 时间线的点本身带 translateX(-8px)，弹出动画要保留这个偏移，不然动完点就歪了 */
+@keyframes pf-pop-dot{0%{opacity:0;transform:translateX(-8px) scale(0)}70%{opacity:1;transform:translateX(-8px) scale(1.25)}100%{transform:translateX(-8px)}}
+.pf-slide.active section ol.timeline>li::before{animation:pf-pop-dot .45s var(--ease) both;animation-delay:calc(var(--d) + .1s)}
+/* 关键的那一步 / 那张卡片 / 那个指标：出来后再轻轻强调一下 */
+.pf-slide.active section :is(.flow>li.is-key,.card.is-highlight,.col.is-highlight,.metric.is-key){animation:pf-rise .5s var(--ease) both,pf-nudge .5s ease-in-out both;animation-delay:var(--d),calc(var(--d) + .7s)}
+/* 装饰（封面的色块 / 大圆、结束页的色块、引言的大引号）：展开出来 */
+.pf-slide.active section:is([data-layout="cover"],[data-layout="quote"])::before,.pf-slide.active section[data-layout="end"]::after{animation:pf-deco .9s var(--ease) both;animation-delay:.05s}
+/* 数字滚动时宽度不跳 */
+section[data-layout="metrics"] .metric strong,section[data-layout="big-number"] .number{font-variant-numeric:tabular-nums}

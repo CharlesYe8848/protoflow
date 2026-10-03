@@ -1,0 +1,14 @@
+/* 新幻灯片 design/ 里的起步样式（create_deck 拷过去）：只保证能看、字够大。之后这份幻灯片自己改、自己加文件。 */
+:root{--ink:#0f172a;--paper:#fff;--muted:#64748b;--line:#e2e8f0;--accent:#0f172a}
+section{background:var(--paper);color:var(--ink);font-family:"PingFang SC","Microsoft YaHei",-apple-system,sans-serif;font-size:36px;line-height:1.5;padding:120px 144px;display:flex;flex-direction:column;gap:32px}
+section h1{font-size:88px;line-height:1.15;margin:0}
+section h2{font-size:64px;line-height:1.2;margin:0}
+section h3{font-size:44px;margin:0}
+section p,section ul,section ol{margin:0}
+section li{margin:12px 0}
+section img{max-width:100%;max-height:100%;object-fit:contain}
+section table{border-collapse:collapse;font-size:30px}
+section th,section td{border:1px solid var(--line);padding:10px 20px}
+section[data-layout="cover"],section[data-layout="end"]{justify-content:center}
+section[data-layout="section"]{justify-content:flex-end;padding-bottom:160px}
+section[data-layout="two-cols"] .cols{display:grid;grid-template-columns:1fr 1fr;gap:80px;flex:1;min-height:0}

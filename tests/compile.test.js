@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validateJsx, extractElementIds, extractElementHints } from "../core/compile.js";
+import { validateJsx, extractElementIds, extractElementHints } from "../products/canvas/compile.js";
 
 const GOOD = `function Component(){\n  return <div id="root-box"><button id="btn-save">保存</button></div>;\n}`;
 const BAD = `function Component(){ return <div id="x">`; // 未闭合

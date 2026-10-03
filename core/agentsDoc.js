@@ -1,78 +1,71 @@
 // core/agentsDoc.js — 纯计算：项目根目录自描述文档（AGENTS.md / CLAUDE.md 共用同一份内容）。
-// 目的：项目文件夹本身就是全部状态，任何 agent 不挂 protoflow 这个 MCP 也能靠这份文档接手——
+// 目的：项目文件夹本身就是全部状态，任何 agent 靠这份文档和 protoflow CLI 就能接手——
 // 对应 HyperFrames 每个项目里都放一份 AGENTS.md 的做法。
+//
+// 框架只写框架自己的部分（project.json、引用、objects/、通用规则、怎么驱动）；各产品的部分由产品
+// 注册描述里的 agentsDoc 提供（products/<产品>/agentsDoc.js），按注册表顺序拼进来。形状：
+//   summary          一句话介绍，拼进开头的产品列表，如 "画布（可交互原型……，`canvases/`）"
+//   dir              产品在项目里的目录，如 "`canvases/`"
+//   refExample       引用写法的例子，如 "`canvas:main@3#ab_123`"
+//   layout           「文件布局」里这个产品的条目（markdown 列表项，已按两格缩进排好）
+//   rules            「硬性规则」里这个产品的条目（markdown 列表项）
+//   commands(pid)    「怎么驱动」代码块里追加的命令行（不含换行）
+//   notes(pid)       「怎么驱动」末尾追加的段落
+// 产品没有哪一项就不写，框架跳过。
 
-export function buildAgentsDoc({ projectId, projectName }) {
+const lines = (xs) => xs.filter(Boolean).join("\n");
+
+export function buildAgentsDoc({ projectId, projectName, products = [] }) {
+  const parts = products.map((p) => p.agentsDoc).filter(Boolean);
+  const summaries = parts.map((a) => a.summary).filter(Boolean).join("、");
+  const dirs = parts.map((a) => a.dir).filter(Boolean).join("、");
+  const refExamples = parts.map((a) => a.refExample).filter(Boolean).join("、");
+  const commands = parts.flatMap((a) => (a.commands ? a.commands(projectId) : []));
+  const notes = parts.map((a) => (a.notes ? a.notes(projectId) : "")).filter(Boolean);
+
   return `# ${projectName}（ProtoFlow 项目）
 
-原型（画板 JSX）→ 标注 → 文档（PRD / 上线公告 / …）→ 发布 全链路项目。这个文件夹本身就是全部
-状态——\`project.json\`、\`pages/\`、\`docs/\` 都是普通文件，可以直接复制、移动、纳入 git，不依赖
-任何常驻服务。
+ProtoFlow 项目：${summaries || "各产品"}是彼此独立的产品，可以单独用，也可以互相引用（见下面的「引用」）。
+把它们串成某种流程（比如原型 → PRD → 上线公告）的模板、写作规范、截图和检查在流程 skill 里
+（ProtoFlow 仓库的 \`skills/\` 目录，内置 \`protoflow-product-dev\`）。这个文件夹本身就是全部状态——\`project.json\`${dirs ? `、\n${dirs}` : ""} 都是普通文件，可以直接复制、移动、纳入 git，不依赖任何常驻服务。
 
 ## 文件布局
 
-- \`project.json\` — 项目名 + 页面 id 列表
-- \`pages/<pageId>/page.json\` — 页面名 + 画板 id 列表
-- \`pages/<pageId>/artboards/<artboardId>/\`
-  - \`source.jsx\` — 画板源码，须定义名为 \`Component\` 的组件
-  - \`meta.json\` — 名称/描述/canvasWidth/\`lastValidatedHash\` / \`annotationsValidatedHash\`（派生字段，见下）
-  - \`annotations.md\` — 这块画板的标注，一篇 markdown。要指向具体元素时写行内链接
-    \`[显示名](#el/元素id)\`（元素 id = \`source.jsx\` 里该节点的 \`id\`）
-  - \`annotations.refs.json\`（可选）— \`{ 元素id: { interactionPath:[…] } }\`，标注里引用的元素若
-    需要先点开/悬浮才可见，把定位步骤记在这里；没有就不生成这个文件
-- \`lib/\`（项目根目录）— vendored JS（react/babel/mermaid/marked），一份，被画板预览引用
-- **单画板预览和整站画布不是文件**——它们是这些源文件的实时投影，由本地预览服务按需渲染
-  （\`render_preview\` / \`render_canvas\` 返回的 \`http://127.0.0.1:<port>/…\` 地址）。改了
-  \`source.jsx\` / \`annotations.md\`、加删页面画板、git checkout / 编辑器 Undo，刷新已打开的
-  浏览器标签即最新，不需要重新跑任何工具。（旧版本会往项目里写 \`canvas.html\` / \`preview.html\`
-  快照——现在不写了；若目录里还残留，删掉即可，是过期产物。）
-- \`docs/<docId>/\` — 通用文档基座。\`docId\`（= 目录名）默认 = 类型名（\`docs/prd/\`、
-  \`docs/release-note/\`）；同项目同类型要多篇时才显式传 \`docId\`（可含中文）。\`doc.md\` 一级标题
-  只写这篇的主题一句话，不带项目名 / 不带「PRD」之类类型字样 / 不带版本号（\`create_doc\` 传
-  \`title\` 会自动填好）。
-  - \`doc.md\` — 当前工作草稿，唯一必须手写的正文（不是结构化 JSON 驱动生成）
-  - \`doc.json\` — \`{ kind, title, origin, head, versions:[{ n, note, author, builtAt, docHash, publishedTo }] }\`。
-    \`head\` 是"当前是哪个版本"的唯一真相源
-  - \`preview.html\` — head 版本的渲染（含自动生成的修改记录表 + 版本切换器），每次 finalize 重写
-  - \`assets/\` — 图片（截图流水线产出 或 手动放入），\`doc.md\` 用 \`![](assets/<file>)\` 引用
-  - \`versions/<n>/\` — 不可变版本快照（\`doc.md\` + \`manifest.json\` + \`assets/\`），\`<n>\` 是从 1
-    递增的整数，不是版本 id。阅读页只有 \`docs/<docId>/preview.html\` 一个（内嵌全部版本，\`?v=<n>\`
-    看历史版本）
-  - \`.build/\` — 截图流水线中间产物（\`captures.json\` 手写；\`snapshot/\`、\`captures-manifest.json\`
-    是产物）。可放心加进 \`.gitignore\`
-- \`doc-kinds/<kind>/\`（项目根目录，可选）— 项目本地的文档类型包，覆盖或新增内置类型
-  （\`kind.json\` + \`template.md\` + \`writing.md\` + 可选 \`checks/*.mjs\`）
-- \`.protoflow/\`（项目根目录，隐藏目录）— 派生的 UI 偏好状态（画布视角、侧边栏收起/展开）
+- \`project.json\` — 项目名 + \`formatVersion\`（存储格式版本；旧格式的项目工具会报 \`FORMAT_OUTDATED\`，先跑
+  \`node <protoflow 仓库路径>/bin/protoflow-migrate.mjs <父目录> --apply\`）
+${lines(parts.map((a) => a.layout))}
+- \`lib/\`（项目根目录）— 各产品预览页引用的第三方库（vendored JS），一份，缺了由工具补上
+- **引用 \`sources\`**（每个产品的每个版本上都有）— \`[{ ref, via, fp? }]\`，这一版用到了项目里哪些
+  产物的哪一版：\`ref\` 格式 \`类型:id@版本#子部位\`${refExamples ? `（如 ${refExamples}）` : ""}；\`via\` 是 \`declared\`（定版时声明）/ \`asset\`（素材旁边的 \`<文件>.source.json\`
+  出处，定版时自动收集）/ \`capture\`（老的截图流水线记下的）。工具维护，不要手改；定版时用
+  \`sources\` 参数声明。
+- \`objects/<前两位>/<sha256>\`（项目根目录）— 所有版本的文件本体，按内容哈希存，同样的内容（比如
+  没改过的截图）整个项目只存一份。要读某个版本的文件：在 \`versions/<n>.json\` 的 \`files\` 里按路径
+  查到 \`hash\`，读 \`objects/<hash 前两位>/<hash>\`。只增不减，不要手改、不要删；**不能**加进
+  \`.gitignore\`（历史版本就在这里）
+- \`.protoflow/\`（项目根目录，隐藏目录）— 派生的界面状态（视角、侧边栏收起/展开）
 
 ## 硬性规则
 
-- \`lastValidatedHash\` / \`annotationsValidatedHash\`（meta.json）、\`doc.json\` 里的 \`docHash\`/
-  \`mdHash\`/\`head\` 都是工具算出来的，**不要手改**。改完 \`source.jsx\` / \`annotations.md\` / \`doc.md\`
-  用 \`chain_status\` 检查影响；它只读计算差异，**不会更新校验基线**。源码通过
-  \`save_artboard_source\` 编译保存，标注实际核对后用 \`write_annotations\` 保存，文档按交付需要 finalize。
-- 手改 \`source.jsx\` / \`annotations.md\` 后原型预览刷新即最新；手改 \`doc.md\` 只改变草稿，
-  文档阅读页仍显示 head 版本，finalize 后才更新。\`versions/<n>/\` 是冻结历史，不要改。
-- 版本只由显式 \`build_doc(mode:"finalize", note:"…")\` 产生，不是每次编辑自动切。什么时候该
-  finalize 见该类型的 \`get_doc_kind\` 里的 writing.md。
+- 各产品元信息里的哈希字段和 \`head\` 都是工具算出来的，**不要手改**。改完源文件用
+  \`get_project --findings true\` 检查影响；它只读计算差异，**不会更新校验基线**。
+- \`versions/\` 和 \`objects/\` 是冻结历史，不要改。版本只由各产品的定版工具显式产生，不是每次编辑自动切。
+${lines(parts.map((a) => a.rules))}
 
 ## 怎么驱动这个项目
 
-先沿用当前项目，不重新创建同名项目；项目 id 是 \`${projectId}\`，\`dir\` 是这个文件夹的父目录。
-用 \`get_project\` 获取结构，按任务读取相关源码和文档。局部修改不重开需求访谈，预览或检查不自动定版或发布。
-
-**方式一**：当前 agent 已挂载 protoflow MCP，先调 \`get_guide({topic:"workflow"})\` 按场景进入。
-
-**方式二**：没挂 MCP 时用同一份代码的非交互 CLI（命令名和参数跟 MCP 工具一一对应，项目 id 就是
-这个文件夹的名字 \`${projectId}\`）。在这个文件夹内运行：
+先沿用当前项目，不重新创建同名项目；项目 id 是 \`${projectId}\`，\`dir\` 是这个文件夹的父目录。所有操作都用
+protoflow CLI（装好了就是 \`protoflow\` 命令，否则 \`node <protoflow 仓库路径>/bin/protoflow-cli.js\`），在这个
+文件夹内运行：
 
 \`\`\`
-node <protoflow 仓库路径>/bin/protoflow-cli.js chain_status '{"projectId":"${projectId}","dir":".."}'
-node <protoflow 仓库路径>/bin/protoflow-cli.js render_canvas '{"projectId":"${projectId}","dir":".."}'
-node <protoflow 仓库路径>/bin/protoflow-cli.js --help
+protoflow get_guide --topic workflow                          # 先读工作流，按场景进入
+protoflow get_project --projectId ${projectId} --dir .. --findings true   # 结构、版本、引用、健康检查
+${lines(commands)}${commands.length ? "\n" : ""}protoflow --help                                              # 全部工具；protoflow help <工具> 看参数
 \`\`\`
 
-看画板/整站画布：用 render_preview / render_canvas 返回的 \`url\`（\`http://127.0.0.1:<port>/...\`）——
-它确保本地预览服务在跑并给出地址，页面内容始终按磁盘当前状态实时渲染。别自己拼 file:// 路径
-（很多浏览器工具打不开），也别期待项目目录里有 \`canvas.html\` / \`preview.html\` 可以直接打开。
-`;
+用户开着这个项目的页面（\`http://127.0.0.1:<端口>/p/…\`）时，可以用 \`--url <页面地址>\` 代替
+\`--projectId\` + \`--dir\`。结构化信息只从 \`get_project\` 拿，不读 ProtoFlow 源码推断怎么操作；删除用
+\`delete\`，不要自己 rm 目录。预览或检查不自动定版或发布。
+${notes.length ? "\n" + notes.join("\n\n") + "\n" : ""}`;
 }

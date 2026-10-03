@@ -4,40 +4,42 @@ import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import * as store from "../core/store.js";
-import { buildDoc, createDoc } from "../core/doc.js";
-import { buildPublishPack } from "../core/publishPack.js";
-import { buildDocExportMarkdown } from "../core/exportDocMarkdown.js";
-import { runProjectExport } from "../core/exportService.js";
+import * as canvasStore from "../products/canvas/store.js";
+import * as docStore from "../products/doc/store.js";
+import { buildDoc, createDoc } from "../products/doc/doc.js";
+import { buildCanvas } from "../products/canvas/canvasVersion.js";
+import { buildDocExportMarkdown } from "../products/doc/exportDocMarkdown.js";
+import { runProjectExport } from "../products/index.js";
 import { readZipEntries } from "../core/zip.js";
+import { tpl } from "./helpers/productDevTemplate.js";
 
 const CTX = { now: () => 1700000000000, genId: (p) => `${p}_1`, author: "Charles" };
 
 function setup() {
   const ws = fs.mkdtempSync(path.join(os.tmpdir(), "pf-expmd-"));
   const proj = store.createProject(ws, "招聘", CTX);
-  const pg = store.upsertPage(ws, proj.id, { name: "流程" }, CTX);
-  const ab = store.upsertArtboard(ws, proj.id, pg.id, { name: "列表页" }, CTX);
-  store.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <div id="l">列表</div>; }`);
+  const pg = canvasStore.upsertPage(ws, proj.id, { name: "流程" }, CTX);
+  const ab = canvasStore.upsertArtboard(ws, proj.id, pg.id, { name: "列表页" }, CTX);
+  canvasStore.saveArtboardSource(ws, proj.id, ab.id, `function Component(){ return <div id="l">列表</div>; }`);
   return { ws, proj, ab };
 }
-const ddir = (ws, pid, docId = "prd") => store.docDir(ws, pid, docId);
+const ddir = (ws, pid, docId = "prd") => docStore.docDir(ws, pid, docId);
 function writeMd(ws, pid, md, docId = "prd") {
   fs.writeFileSync(path.join(ddir(ws, pid, docId), "doc.md"), md);
 }
-async function sealOneCapture(ws, pid, ab, docId = "prd") {
-  const d = path.join(ddir(ws, pid, docId), ".build");
-  fs.mkdirSync(d, { recursive: true });
-  fs.writeFileSync(path.join(d, "captures.json"), JSON.stringify({ captures: [{ id: "cap-a", artboardId: ab.id, title: "A", annotationIds: [] }] }));
-  await buildDoc(ws, pid, docId, "snapshot", {}, CTX);
-  await buildPublishPack(ws, pid, docId, "previews", CTX);
-  fs.writeFileSync(path.join(d, "exported-images", "cap-a.png"), "PNGBYTES");
-  await buildPublishPack(ws, pid, docId, "seal", CTX);
+// 截图脚本的产物（skills/protoflow-product-dev/scripts/capture.mjs）：画布先定一版，assets/ 里放图片和出处文件。
+function placeCapture(ws, pid, ab, docId = "prd", bytes = "PNGBYTES") {
+  if (!canvasStore.canvasHead(ws, pid, "main")) buildCanvas(ws, pid, { note: "v1" }, CTX);
+  const a = path.join(ddir(ws, pid, docId), "assets");
+  fs.mkdirSync(a, { recursive: true });
+  fs.writeFileSync(path.join(a, "cap-a.png"), bytes);
+  fs.writeFileSync(path.join(a, "cap-a.png.source.json"), JSON.stringify({ ref: `canvas:main@${canvasStore.canvasHead(ws, pid, "main")}#${ab.id}` }));
 }
 
 test("exportDocMarkdown：不落盘到项目目录——只回 { filename, buffer }，文件名 = 标题 + .zip", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "结账 PRD" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "结账 PRD" }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(ws, proj.id, "# 结账 PRD\n\n正文\n\n![截图](assets/cap-a.png)\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
 
@@ -50,8 +52,8 @@ test("exportDocMarkdown：不落盘到项目目录——只回 { filename, buffe
 
 test("exportDocMarkdown：zip 里是 <标题>.md + assets/ 真实文件，图片引用保持相对路径，不转 data URI；mermaid 代码块原样保留", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "结账 PRD" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "结账 PRD" }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(
     ws,
     proj.id,
@@ -70,20 +72,23 @@ test("exportDocMarkdown：zip 里是 <标题>.md + assets/ 真实文件，图片
   assert.ok(md.includes("```mermaid\nsequenceDiagram"), "mermaid 代码块原样保留，不转图片");
 });
 
-test("exportDocMarkdown：正文里的 <!-- protoflow:changelog --> 标记原地展开成表（只有当前这一版，跟 zip/html 导出一致不带历史版本）；没有标记就原样不动", async () => {
+test("exportDocMarkdown：正文里的 <!-- protoflow:changelog --> 标记原地展开成表（正文只带当前版本，但表要带上全部历史版本，跟在线预览页一致）；没有标记就原样不动", async () => {
   const { ws, proj } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "结账 PRD" }, CTX);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "结账 PRD" }, CTX);
   writeMd(ws, proj.id, "# 结账 PRD\n\n<!-- protoflow:changelog -->\n\n正文\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
+  writeMd(ws, proj.id, "# 结账 PRD\n\n<!-- protoflow:changelog -->\n\n正文 v2\n");
+  await buildDoc(ws, proj.id, "prd", "finalize", { note: "第二版" }, CTX);
 
   const out = buildDocExportMarkdown(ws, proj.id, "prd");
   const entries = readZipEntries(out.buffer);
   const md = entries.find((e) => e.name === "结账 PRD/结账 PRD.md").data.toString("utf8");
   assert.ok(!md.includes("<!-- protoflow:changelog -->"), "标记被替换掉了");
   assert.ok(md.includes("| 版本 | 修改日期 | 修改人 | 修改内容 |"), "原地展开成表");
-  assert.ok(md.includes("| v1 | "), "带上当前版本这一行");
+  assert.ok(md.includes("| v2 | ") && md.includes("第二版"), "带上当前版本这一行");
+  assert.ok(md.includes("| v1 | ") && md.includes("首版"), "也带上历史版本（v1），不是只有当前这一版");
 
-  createDoc(ws, proj.id, { kind: "release-note", title: "结账上线公告" }, CTX);
+  createDoc(ws, proj.id, { docId: "release-note", ...tpl("release-note"), title: "结账上线公告" }, CTX);
   writeMd(ws, proj.id, "# 结账上线公告\n\n正文，不放标记\n", "release-note");
   await buildDoc(ws, proj.id, "release-note", "finalize", { note: "首版" }, CTX);
   const rnOut = buildDocExportMarkdown(ws, proj.id, "release-note");
@@ -94,7 +99,7 @@ test("exportDocMarkdown：正文里的 <!-- protoflow:changelog --> 标记原地
 
 test("exportDocMarkdown：没有图片时不生成 assets/ 目录", async () => {
   const { ws, proj } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "无图 PRD" }, CTX);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "无图 PRD" }, CTX);
   writeMd(ws, proj.id, "# 无图 PRD\n\n正文，没有图片\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
 
@@ -105,14 +110,14 @@ test("exportDocMarkdown：没有图片时不生成 assets/ 目录", async () => 
 
 test("exportDocMarkdown：文档没有任何版本时返回 null", () => {
   const { ws, proj } = setup();
-  createDoc(ws, proj.id, { kind: "prd" }, CTX);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd") }, CTX);
   assert.equal(buildDocExportMarkdown(ws, proj.id, "prd"), null);
 });
 
 test("exportDocMarkdown：runProjectExport('doc/<id>/markdown') 走这条路由，mime 取自 exportFormats 登记表", async () => {
   const { ws, proj, ab } = setup();
-  createDoc(ws, proj.id, { kind: "prd", title: "结账 PRD" }, CTX);
-  await sealOneCapture(ws, proj.id, ab);
+  createDoc(ws, proj.id, { docId: "prd", ...tpl("prd"), title: "结账 PRD" }, CTX);
+  await placeCapture(ws, proj.id, ab);
   writeMd(ws, proj.id, "# 结账 PRD\n\n正文\n\n![截图](assets/cap-a.png)\n");
   await buildDoc(ws, proj.id, "prd", "finalize", { note: "首版" }, CTX);
 

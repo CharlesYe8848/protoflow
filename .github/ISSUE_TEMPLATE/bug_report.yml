@@ -12,7 +12,7 @@ body:
     id: environment
     attributes:
       label: 操作系统、Node 版本及使用入口
-      placeholder: macOS / Node 22.20.0 / Codex MCP
+      placeholder: macOS / Node 22.20.0 / Codex CLI
     validations:
       required: true
   - type: textarea

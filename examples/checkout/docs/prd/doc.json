@@ -1,8 +1,6 @@
 {
   "schemaVersion": 1,
-  "kind": "prd",
   "title": "购物车与支付方式",
-  "template": "prd",
   "origin": null,
   "head": 1,
   "versions": [
@@ -18,9 +16,24 @@
         "ab_1789430400001": "c69e8e0e664ac2d6",
         "ab_1789430400003": "5ad101dec91790c3"
       },
-      "publishedTo": []
+      "publishedTo": [],
+      "sources": [
+        {
+          "ref": "canvas:main#ab_1789430400001",
+          "via": "capture",
+          "fp": "c69e8e0e664ac2d6"
+        },
+        {
+          "ref": "canvas:main#ab_1789430400003",
+          "via": "capture",
+          "fp": "5ad101dec91790c3"
+        }
+      ]
     }
   ],
   "createdAt": "2026-09-15T00:00:00.004Z",
-  "updatedAt": "2026-09-15T00:00:00.006Z"
+  "updatedAt": "2026-09-15T00:00:00.006Z",
+  "labels": [
+    "product-dev/prd"
+  ]
 }

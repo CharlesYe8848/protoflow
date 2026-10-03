@@ -1,0 +1,4 @@
+/* 主题：墨 */
+:root{--accent:#0f172a;--accent-ink:#ffffff;--accent-tint:#e2e8f0}
+/* 墨色主题：强调色就是墨色，强调色页和深色页区分不开，强调色页改成浅灰底 */
+section.is-accent{background:#e2e8f0;color:var(--ink);--accent-ink:var(--ink);--ink:#0f172a;--ink-2:#334155;--muted:#475569;--line:rgba(15,23,42,.15);--chart-soft:rgba(15,23,42,.2)}

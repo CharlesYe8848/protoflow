@@ -2,10 +2,12 @@ import { test, after } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import http from "node:http";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import path from "node:path";
 import os from "node:os";
 import { createHmac } from "node:crypto";
-import { ensureLocalServer, toLocalUrl, createStaticHandler, resolveProjectsPath } from "../core/localServer.js";
+import { ensureLocalServer, toLocalUrl, createStaticHandler, resolveProjectsPath, singletonDecision } from "../core/localServer.js";
 
 const tmpStatusPath = () => path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pf-srv-")), "server.json");
 const spawnedPids = [];
@@ -138,6 +140,38 @@ test("__protoflow_state：注册项目后不带 token/cookie 就能保存派生�
   server.closeAllConnections();
 });
 
+test("__protoflow_shot：只截本项目的页面（地址由服务端拼）；图写进 .protoflow/shots/ 回绝对路径；没注入截图能力回 501", async () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-srv-shot-"));
+  const secret = "test-secret-shot";
+  const calls = [];
+  const capture = async (opts) => { calls.push(opts); return Buffer.from("ffd8ffe0", "hex"); };
+  const server = await listen(createStaticHandler(secret, undefined, null, undefined, undefined, capture));
+  const { port } = server.address();
+  const { key } = await register(port, secret, "P", dir);
+  const post = (body, k = key) => fetch(`http://127.0.0.1:${port}/p/${encodeURIComponent(k)}/__protoflow_shot`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+
+  const ok = await post({ page: "decks/d/preview.html?v=2#3", selector: ".pf-slide", boxes: [{ x: 0.1, y: 0.1, w: 0.2, h: 0.2 }], viewport: { width: 1200, height: 800 } });
+  assert.equal(ok.status, 200);
+  const r = await ok.json();
+  assert.ok(r.path.startsWith(path.join(fs.realpathSync(dir), ".protoflow", "shots")) && fs.existsSync(r.path));
+  assert.ok(r.dataUrl.startsWith("data:image/jpeg;base64,") && r.path.endsWith(".jpg"));
+  assert.equal(calls[0].url, `http://127.0.0.1:${port}/p/${encodeURIComponent(key)}/decks/d/preview.html?v=2#3`, "打开的是本服务上这个项目的页面");
+  assert.deepEqual(calls[0].viewport, { width: 1200, height: 800 });
+
+  assert.equal((await post({ page: "http://evil.example/x.html", selector: "a", boxes: [] })).status, 400, "不接受任意网址");
+  assert.equal((await post({ page: "/etc/x.html", selector: "a", boxes: [] })).status, 400);
+  assert.equal((await post({ page: "decks/d/preview.html", selector: "a", boxes: [] }, "nope")).status, 404);
+  server.close(); server.closeAllConnections();
+
+  const bare = await listen(createStaticHandler(secret));
+  const k2 = (await register(bare.address().port, secret, "P", dir)).key;
+  const r2 = await fetch(`http://127.0.0.1:${bare.address().port}/p/${encodeURIComponent(k2)}/__protoflow_shot`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ page: "a.html", selector: "a", boxes: [] }) });
+  assert.equal(r2.status, 501);
+  bare.close(); bare.closeAllConnections();
+});
+
 test("__protoflow_state：未注册的项目 404；stateKey 带路径穿越字符拒绝；非对象/超限 body 拒绝", async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-srv-state2-"));
   const secret = "test-secret-6";
@@ -181,7 +215,11 @@ function mkProject(name) {
 
 test("resolveProjectsPath：默认在 ~/.protoflow/projects.json，env / 参数可覆盖", () => {
   assert.equal(resolveProjectsPath("/tmp/x/projects.json"), "/tmp/x/projects.json");
-  assert.ok(resolveProjectsPath().endsWith(path.join(".protoflow", "projects.json")));
+  const saved = process.env.PROTOFLOW_PROJECTS_STATE;
+  delete process.env.PROTOFLOW_PROJECTS_STATE; // npm test 会指到临时目录，这里要看的是没设时的默认值
+  try { assert.ok(resolveProjectsPath().endsWith(path.join(".protoflow", "projects.json"))); }
+  finally { if (saved !== undefined) process.env.PROTOFLOW_PROJECTS_STATE = saved; }
+  assert.equal(resolveProjectsPath(), saved ?? resolveProjectsPath(), "env 可覆盖");
 });
 
 test("GET /__protoflow_projects：返回最近打开的项目（最近的在前），只含 id/name/lastOpenedAt，不吐绝对路径 dir", async () => {
@@ -299,7 +337,7 @@ test("toLocalUrl：absPath 不在 projectDir 之内时明确报错，不是静�
   }
 });
 
-test("HTTP 文件边界：拒绝隐藏文件、符号链接和不支持的类型，保留状态与截图预览", async (t) => {
+test("HTTP 文件边界：拒绝隐藏文件、符号链接和不支持的类型，只放行派生状态（老的截图预览页特例已去掉）", async (t) => {
   const temp = fs.mkdtempSync(path.join(os.tmpdir(), "pf-boundary-"));
   const dir = path.join(temp, "project");
   fs.mkdirSync(dir);
@@ -315,10 +353,10 @@ test("HTTP 文件边界：拒绝隐藏文件、符号链接和不支持的类型
   t.after(() => { server.close(); server.closeAllConnections(); fs.rmSync(temp, { recursive: true, force: true }); });
   const { port } = server.address();
   await register(port, "boundary", "P", dir);
-  for (const name of [".env", ".git/config", "nested/.env.json", "key.pem", "leak.json", "alias.json", "linked-dir/outside.json", "linked-dir/preview.html", "docs/prd/.build/captures.json", "%2eenv", "nested%5c.env.json"]) {
+  for (const name of [".env", ".git/config", "nested/.env.json", "key.pem", "leak.json", "alias.json", "linked-dir/outside.json", "linked-dir/preview.html", "docs/prd/.build/captures.json", "docs/prd/.build/previews/cart.html", "%2eenv", "nested%5c.env.json"]) {
     assert.equal((await rawGet(port, `/p/P/${name}`)).status, 403, name);
   }
-  for (const name of [".protoflow/canvas.json", "docs/prd/.build/previews/cart.html", "assets/icon.svg", "pages/new/preview.html"]) {
+  for (const name of [".protoflow/canvas.json", "assets/icon.svg", "pages/new/preview.html"]) {
     assert.equal((await rawGet(port, `/p/P/${name}`)).status, 200, name);
   }
 });
@@ -377,4 +415,231 @@ test("异步导出返回下载文件，异步错误返回 500", async (t) => {
   const failed = await fetch(base + "/fail", { method: "POST" });
   assert.equal(failed.status, 500);
   assert.match(await failed.text(), /Word 生成失败/);
+});
+
+
+test("导出进度：请求带 ?job=，导出过程中产品报的进度能按任务号轮询到；没带任务号或任务号不对拿到空对象", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-export-progress-"));
+  let release, reported;
+  const reachedHalf = new Promise((r) => { reported = r; });
+  const server = await listen(createStaticHandler("secret", undefined, null, async (_root, _sub, { onProgress } = {}) => {
+    onProgress({ fraction: 0.5, stage: "录制画面" });
+    reported();
+    await new Promise((r) => { release = r; });
+    return { filename: "a.mp4", buffer: Buffer.from("mp4"), mime: "video/mp4" };
+  }));
+  t.after(() => { server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const { key } = await register(port, "secret", "export", dir);
+  const origin = `http://127.0.0.1:${port}`;
+  const pending = fetch(`${origin}/p/${key}/__protoflow_export/deck/d/mp4?job=job12345abc`, { method: "POST" });
+  await reachedHalf;
+  const progress = (job) => fetch(`${origin}/__protoflow_export_progress?job=${job}`).then((r) => r.json());
+  assert.deepEqual(await progress("job12345abc"), { fraction: 0.5, stage: "录制画面", meta: {}, preview: 0 });
+  assert.deepEqual(await progress("nope"), {});
+  release();
+  const done = await pending;
+  assert.equal(done.status, 200);
+  assert.equal(await done.text(), "mp4");
+});
+
+test("导出进度弹窗：产品报的预览图按序号取；页面中断请求时导出收到取消信号", async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "pf-export-preview-"));
+  const frame = path.join(dir, "f1.jpg");
+  fs.writeFileSync(frame, Buffer.from("fake-jpeg"));
+  let reported, aborted;
+  const reachedFrame = new Promise((r) => { reported = r; });
+  const gotAbort = new Promise((r) => { aborted = r; });
+  const server = await listen(createStaticHandler("secret", undefined, null, async (_root, _sub, { onProgress, signal } = {}) => {
+    onProgress({ fraction: 0.3, stage: "录制画面", preview: frame, meta: { durationMs: 12000 } });
+    reported();
+    await new Promise((_, reject) => signal.addEventListener("abort", () => { aborted(); reject(new Error("aborted")); }));
+  }));
+  t.after(() => { server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const { port } = server.address();
+  const { key } = await register(port, "secret", "export", dir);
+  const origin = `http://127.0.0.1:${port}`;
+  const ctrl = new AbortController();
+  const pending = fetch(`${origin}/p/${key}/__protoflow_export/deck/d/mp4?job=jobpreview1`, { method: "POST", signal: ctrl.signal }).catch(() => "aborted");
+  await reachedFrame;
+  const p = await fetch(`${origin}/__protoflow_export_progress?job=jobpreview1`).then((r) => r.json());
+  assert.deepEqual(p, { fraction: 0.3, stage: "录制画面", meta: { durationMs: 12000 }, preview: 1 });
+  const img = await fetch(`${origin}/__protoflow_export_preview?job=jobpreview1&v=1`);
+  assert.equal(img.status, 200);
+  assert.equal(img.headers.get("content-type"), "image/jpeg");
+  assert.equal(await img.text(), "fake-jpeg");
+  assert.equal((await fetch(`${origin}/__protoflow_export_preview?job=nope1234`)).status, 404);
+  ctrl.abort();
+  await gotAbort; // 连接断了，导出收到取消信号
+  assert.equal(await pending, "aborted");
+});
+
+// 使用独立状态目录，所有测试只清理自己启动的进程。
+function isolatedServer(t) {
+  const statusPath = tmpStatusPath();
+  t.after(() => {
+    try { process.kill(JSON.parse(fs.readFileSync(statusPath, "utf8")).pid); } catch {}
+    try {
+      for (const pid of fs.readFileSync(path.join(path.dirname(statusPath), "starts.jsonl"), "utf8").trim().split("\n")) {
+        try { process.kill(Number(pid)); } catch {}
+      }
+    } catch {}
+    fs.rmSync(path.dirname(statusPath), { recursive: true, force: true });
+  });
+  return statusPath;
+}
+
+test("同进程并发冷启动：所有调用共享服务且启动锁释放", async (t) => {
+  const statusPath = isolatedServer(t);
+  const results = await Promise.all(Array.from({ length: 8 }, () => ensureLocalServer({ statusPath })));
+  assert.equal(new Set(results.map((s) => s.port)).size, 1);
+  assert.equal(new Set(results.map((s) => s.secret)).size, 1);
+  assert.equal(fs.existsSync(statusPath + ".lock"), false);
+  assert.deepEqual(fs.readdirSync(path.dirname(statusPath)).filter((p) => p.endsWith(".tmp")), []);
+});
+
+test("独立 CLI 进程并发冷启动：只 spawn 一个后台服务", async (t) => {
+  const statusPath = isolatedServer(t);
+  const logPath = path.join(path.dirname(statusPath), "starts.jsonl");
+  const preload = path.join(path.dirname(statusPath), "observe.mjs");
+  fs.writeFileSync(preload, `import fs from 'node:fs';
+    if (process.argv[1]?.endsWith('protoflow-server.mjs'))
+      fs.appendFileSync(${JSON.stringify(logPath)}, JSON.stringify(process.pid) + String.fromCharCode(10));`);
+  const moduleUrl = new URL("../core/localServer.js", import.meta.url).href;
+  const code = `import { ensureLocalServer } from ${JSON.stringify(moduleUrl)};
+    const result = await ensureLocalServer({ statusPath: ${JSON.stringify(statusPath)} });
+    console.log(result.port);`;
+  const env = { ...process.env, NODE_OPTIONS: `${process.env.NODE_OPTIONS || ""} --import=${preload}` };
+  const results = await Promise.allSettled(Array.from({ length: 5 }, () =>
+    promisify(execFile)(process.execPath, ["--input-type=module", "-e", code], { env, timeout: 40000 })));
+  for (const result of results) if (result.status === "rejected") throw result.reason;
+  assert.equal(new Set(results.map((r) => r.value.stdout.trim())).size, 1);
+  assert.equal(fs.readFileSync(logPath, "utf8").trim().split("\n").length, 1);
+});
+
+test("残留锁和损坏状态可恢复", async (t) => {
+  const statusPath = isolatedServer(t);
+  fs.writeFileSync(statusPath, '{broken');
+  fs.mkdirSync(statusPath + ".lock");
+  const old = new Date(Date.now() - 60000);
+  fs.utimesSync(statusPath + ".lock", old, old);
+  const result = await ensureLocalServer({ statusPath });
+  assert.equal((await fetch(`http://127.0.0.1:${result.port}/__protoflow_ping`)).status, 200);
+  assert.equal(fs.existsSync(statusPath + ".lock"), false);
+});
+
+test("子进程启动失败释放锁，后续调用可重试", async (t) => {
+  const statusPath = isolatedServer(t);
+  const preload = path.join(path.dirname(statusPath), "fail.mjs");
+  fs.writeFileSync(preload, "process.exit(23);");
+  const previous = process.env.NODE_OPTIONS;
+  try {
+    process.env.NODE_OPTIONS = `--import=${preload}`;
+    await assert.rejects(ensureLocalServer({ statusPath }), /启动失败/);
+  } finally {
+    if (previous === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = previous;
+  }
+  assert.equal(fs.existsSync(statusPath + ".lock"), false);
+  const result = await ensureLocalServer({ statusPath });
+  assert.ok(result.port);
+});
+
+test("存活进程持续探活失败：不另起服务且释放锁", async (t) => {
+  const statusPath = isolatedServer(t);
+  const server = await listen((_req, res) => res.writeHead(503).end());
+  t.after(() => { server.close(); server.closeAllConnections(); });
+  fs.writeFileSync(statusPath, JSON.stringify({ pid: process.pid, port: server.address().port, secret: "test" }));
+  try {
+    await assert.rejects(ensureLocalServer({ statusPath }), /仍在运行但未响应/);
+    assert.equal(fs.existsSync(statusPath + ".lock"), false);
+    assert.equal(JSON.parse(fs.readFileSync(statusPath, "utf8")).pid, process.pid);
+  } finally {
+    // 此用例记录的是测试进程，清理钩子不能把它当作后台服务结束。
+    fs.unlinkSync(statusPath);
+  }
+});
+
+
+test("启动超时会终止子进程并释放锁", async (t) => {
+  const statusPath = isolatedServer(t);
+  const preload = path.join(path.dirname(statusPath), "slow.mjs");
+  const logPath = path.join(path.dirname(statusPath), "starts.jsonl");
+  fs.writeFileSync(preload, `import fs from 'node:fs';
+    fs.writeFileSync(${JSON.stringify(logPath)}, String(process.pid));
+    await new Promise(resolve => setTimeout(resolve, 15000));`);
+  const previous = process.env.NODE_OPTIONS;
+  try {
+    process.env.NODE_OPTIONS = `--import=${preload}`;
+    await assert.rejects(ensureLocalServer({ statusPath }), /启动超时/);
+  } finally {
+    if (previous === undefined) delete process.env.NODE_OPTIONS;
+    else process.env.NODE_OPTIONS = previous;
+  }
+  const pid = Number(fs.readFileSync(logPath, "utf8"));
+  assert.throws(() => process.kill(pid, 0), { code: "ESRCH" });
+  assert.equal(fs.existsSync(statusPath + ".lock"), false);
+  assert.equal(fs.existsSync(statusPath), false);
+});
+
+test("singletonDecision：状态文件记的是自己就留着；记的是另一个活进程就退出让位；没记录或记录的进程已死就把记录收回来", () => {
+  const alive = new Set([111, 222]);
+  const pidAlive = (p) => alive.has(p);
+  assert.equal(singletonDecision({ pid: 111 }, 111, pidAlive), "keep");
+  assert.equal(singletonDecision({ pid: 222 }, 111, pidAlive), "exit");
+  assert.equal(singletonDecision({ pid: 999 }, 111, pidAlive), "reclaim");
+  assert.equal(singletonDecision(null, 111, pidAlive), "reclaim");
+});
+
+test("后台服务单例自检（真实进程）：状态文件被改成指向别的活进程时，旧服务自己退出，不再堆成孤儿；记录失效时把记录收回来", async () => {
+  const prev = process.env.PROTOFLOW_SINGLETON_CHECK_MS;
+  process.env.PROTOFLOW_SINGLETON_CHECK_MS = "200";
+  try {
+    // 记录失效 → 收回
+    const statusA = tmpStatusPath();
+    await ensureLocalServer({ statusPath: statusA });
+    const a = JSON.parse(fs.readFileSync(statusA, "utf8"));
+    spawnedPids.push(a.pid);
+    fs.writeFileSync(statusA, JSON.stringify({ ...a, pid: 999999 }));
+    await new Promise((r) => setTimeout(r, 800));
+    assert.equal(JSON.parse(fs.readFileSync(statusA, "utf8")).pid, a.pid, "记录指向的进程已死，服务把记录改回指向自己");
+
+    // 被别的活进程顶替 → 退出
+    fs.writeFileSync(statusA, JSON.stringify({ ...a, pid: process.pid }));
+    await new Promise((r) => setTimeout(r, 800));
+    let stillAlive = true;
+    try { process.kill(a.pid, 0); } catch { stillAlive = false; }
+    assert.equal(stillAlive, false, "状态文件记的是另一个活进程时，这个服务就是孤儿，自己退出");
+  } finally {
+    if (prev === undefined) delete process.env.PROTOFLOW_SINGLETON_CHECK_MS; else process.env.PROTOFLOW_SINGLETON_CHECK_MS = prev;
+  }
+});
+
+test("POST /__protoflow_ui：用户级界面偏好浅合并落到注册表同目录的 ui.json；返回页面时通过 renderView 第三个参数带给渲染层", async () => {
+  const projectsPath = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "pf-srv-ui-")), "projects.json");
+  const uiPath = path.join(path.dirname(projectsPath), "ui.json");
+  const secret = "test-secret-ui";
+  let seen = null;
+  const server = await listen(createStaticHandler(secret, (_root, relPath, opts) => {
+    if (relPath === "canvas.html") { seen = opts; return "<html></html>"; }
+    return null;
+  }, projectsPath));
+  const { port } = server.address();
+  const post = (body) => fetch(`http://127.0.0.1:${port}/__protoflow_ui`, { method: "POST", headers: { "Content-Type": "application/json" }, body });
+
+  try {
+    assert.equal((await post(JSON.stringify({ projectNavOpen: true }))).status, 200);
+    assert.equal((await post(JSON.stringify({ other: 1 }))).status, 200);
+    assert.deepEqual(JSON.parse(fs.readFileSync(uiPath, "utf8")), { projectNavOpen: true, other: 1 }, "浅合并，不覆盖掉别的键");
+    assert.equal((await post("[1,2]")).status, 400, "只接受 JSON 对象");
+    assert.equal((await post("x".repeat(200 * 1024))).status, 400, "有大小上限");
+
+    const dir = mkProject("结账流程");
+    await register(port, secret, "结账流程", dir);
+    await fetch(`http://127.0.0.1:${port}/p/${encodeURIComponent("结账流程")}/canvas.html?v=2`);
+    assert.deepEqual(seen, { ui: { projectNavOpen: true, other: 1 }, query: "v=2" }, "地址 ? 后面的部分也带给渲染层");
+  } finally {
+    server.close();
+    server.closeAllConnections();
+  }
 });

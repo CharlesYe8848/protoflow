@@ -5,9 +5,18 @@ import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { launch } from 'puppeteer-core';
-import { buildCanvasHtml } from '../core/canvas.js';
-import { buildPreviewHtml, copyPreviewLibs } from '../core/preview.js';
-import { resolveBrowserExecutable } from '../core/headlessBrowser.js';
+import { buildCanvasHtml } from '../products/canvas/canvas.js';
+import { buildPreviewHtml } from '../products/canvas/preview.js';
+import { copyLibs } from '../core/libs.js';
+import { CANVAS_LIBS, PREVIEW_LIB_FILES } from '../products/canvas/libs.js';
+const copyPreviewLibs = (dir) => copyLibs(dir, CANVAS_LIBS, PREVIEW_LIB_FILES);
+import { resolveBrowserExecutable } from '../skills/protoflow-product-dev/scripts/lib/headlessBrowser.js';
+
+// 页面列表在顶栏的页面切换下拉里：先点开下拉，再点那一页（跟真人操作一样）。
+async function switchPage(page, id) {
+  await page.click('.pf-pgsel-btn');
+  await page.click(`.pf-page-item[data-page="${id}"]`);
+}
 
 test('Mermaid on an inactive canvas page renders and survives page switches without reload', { timeout: 30000 }, async () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pf-canvas-mermaid-'));
@@ -41,14 +50,14 @@ test('Mermaid on an inactive canvas page renders and survives page switches with
     assert.equal(await page.$eval('[data-page="pg_diagram"].pf-page-canvas', el => el.hidden), true);
     assert.equal(await frame.evaluate(() => window.renderError), undefined, 'hidden-page SVG must stay in the render tree');
     for (let i = 0; i < 3; i++) {
-      await page.click('.pf-page-item[data-page="pg_diagram"]');
+      await switchPage(page, 'pg_diagram');
       await page.waitForSelector('.pf-page-canvas[data-page="pg_diagram"]:not(.pf-loading):not([hidden])');
       await frame.waitForSelector('#counter', { visible: true });
       assert.equal(await frame.$eval('.mermaid', el => el.textContent.includes('Syntax error')), false);
       assert.ok(await frame.$eval('.mermaid svg', el => el.getBBox().width > 0));
       await frame.click('#counter');
       assert.equal(await frame.$eval('#counter', el => el.textContent), String(i + 1), 'switching must preserve component state');
-      await page.click('.pf-page-item[data-page="pg_home"]');
+      await switchPage(page, 'pg_home');
     }
   } finally {
     if (browser) await browser.close();
@@ -80,15 +89,15 @@ test('switching to a page with a saved viewport refreshes iframe height without 
     // All initial load reports have occurred while the page is inactive.
     await new Promise(resolve => setTimeout(resolve, 1200));
     const transform = await page.$eval('[data-page="pg_mobile"] .pf-canvas', el => el.style.transform);
-    await page.click('.pf-page-item[data-page="pg_mobile"]');
+    await switchPage(page, 'pg_mobile');
     await page.waitForFunction(() => document.querySelector('iframe').clientHeight >= 900, { timeout: 2000 });
     assert.equal(await page.$eval('[data-page="pg_mobile"] .pf-canvas', el => el.style.transform), transform);
     await frame.click('#count');
     await page.waitForFunction(() => document.querySelector('iframe').clientHeight >= 1000);
-    await page.click('.pf-page-item[data-page="pg_home"]');
+    await switchPage(page, 'pg_home');
     await frame.evaluate(() => document.querySelector('#count').click());
     await new Promise(resolve => setTimeout(resolve, 100));
-    await page.click('.pf-page-item[data-page="pg_mobile"]');
+    await switchPage(page, 'pg_mobile');
     await page.waitForFunction(() => document.querySelector('iframe').clientHeight >= 1100, { timeout: 2000 });
     assert.equal(await frame.$eval('#count', el => el.textContent), '2');
     assert.equal(await page.$eval('[data-page="pg_mobile"] .pf-canvas', el => el.style.transform), transform);

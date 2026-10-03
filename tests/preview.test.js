@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { buildPreviewHtml, copyPreviewLibs, PREVIEW_LIB_FILES } from "../core/preview.js";
+import { buildPreviewHtml } from "../products/canvas/preview.js";
+import { copyLibs } from "../core/libs.js";
+import { CANVAS_LIBS, PREVIEW_LIB_FILES } from "../products/canvas/libs.js";
 
 test("buildPreviewHtml 输出无外部 http 引用，lib 用相对路径，源码与资产内联", () => {
   const html = buildPreviewHtml({
@@ -19,6 +21,17 @@ test("buildPreviewHtml 输出无外部 http 引用，lib 用相对路径，源�
   assert.ok(html.includes("function Component()"));
   assert.ok(html.includes("data:image/png;base64,AAA"));
   assert.ok(html.includes("你好</div>"), "普通 JSX 闭合标签不得被转义破坏");
+});
+
+test("buildPreviewHtml 未传 assetsMap 时保留画板源码的 assets/ 路径，不注入 base64 替换器", () => {
+  const html = buildPreviewHtml({
+    artboardId: "ab_path",
+    source: `function Component(){ return <img src="assets/shot.webp"/>; }`,
+    libRelPath: "../../../../lib",
+  });
+  assert.ok(html.includes('src="assets/shot.webp"'));
+  assert.ok(!html.includes("window.__ASSETS__"));
+  assert.ok(!html.includes("data:image/webp;base64"));
 });
 
 test("mermaid.min.js 按需加载——回归测试：3.5MB，比 react+react-dom+babel 加起来还重好几倍，没用到 mermaid 的画板不该多付这份网络/解析成本；源码里出现 “mermaid” 字样才生成引用它的 <script> 标签，还要在渲染前 startOnLoad:false（默认会在 DOMContentLoaded 时自动扫描渲染，早于 React 把内容挂到 #root，会扑空）", () => {
@@ -160,8 +173,8 @@ test("标注定位高亮不直接给目标元素加 CSS outline——回归测�
   assert.ok(html.includes('border:2px solid #e11d48'), "高亮矩形用 border（画在图层自己的盒子里，不受目标祖先 overflow 影响），不是 outline");
 });
 
-test("copyPreviewLibs 拷贝 PREVIEW_LIB_FILES 里的每个 UMD 文件（react/react-dom/babel + mermaid）", () => {
+test("copyLibs 拷贝画布 PREVIEW_LIB_FILES 里的每个 UMD 文件（react/react-dom/babel + mermaid）", () => {
   const dst = fs.mkdtempSync(path.join(os.tmpdir(), "pf-lib-"));
-  copyPreviewLibs(dst);
+  copyLibs(dst, CANVAS_LIBS, PREVIEW_LIB_FILES);
   for (const f of PREVIEW_LIB_FILES) assert.ok(fs.existsSync(path.join(dst, f)), f);
 });

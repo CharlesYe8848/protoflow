@@ -13,7 +13,7 @@ npm run demo
 ```
 
 命令会复制示例到系统临时目录，并输出 `projectDir`、`canvas`、`prd` 和 `releaseNote`。
-打开 `canvas`、`prd` 和 `releaseNote` 链接即可；无需 MCP、平台账号或模型 API Key。
+打开 `canvas`、`prd` 和 `releaseNote` 链接即可；无需连接 AI 助手、平台账号或模型 API Key。
 临时目录可能被系统清理，长期使用请把输出的 `projectDir` 复制到自己的工作目录。
 
 1. 在购物车页减到 0：合计变为 0，去支付禁用；加回 1 后恢复。
@@ -29,10 +29,11 @@ npm run demo
 把 `npm run demo` 输出的项目目录告诉 agent：
 
 > 打开这个 ProtoFlow 项目，把购物车商品单价从 129 元改成 139 元，保持元素 ID，
-> 然后运行 chain_status，告诉我哪些标注和文档需要更新。
+> 然后做一次健康检查，告诉我哪些标注和文档需要更新。
 
-agent 应使用 `projectId: "checkout"`，`dir` 为该项目的父目录。修改之后会看到
-`annotation_review` 与 `doc_drifted`；如果直接编辑文件而没有通过工具保存，
+agent 用 `protoflow get_project --projectId checkout --dir <该项目的父目录> --findings true` 检查（或者用画布页地址
+`--url <地址>` 定位项目）。修改保存之后会看到 `annotation_review`（标注待核对）与 `ref_stale`（PRD 引用的
+画板变了）；如果直接编辑文件而没有通过工具保存，
 还会看到 `unvalidated`。原始示例基线的检查结果为空。
 
 这个提醒基于 PRD 版本中记录的真实截图指纹，不是演示用的硬编码状态。
@@ -42,8 +43,8 @@ agent 应使用 `projectId: "checkout"`，`dir` 为该项目的父目录。修�
 - [项目描述](checkout/project.json)
 - [PRD 正文](checkout/docs/prd/doc.md)
 - [上线公告正文](checkout/docs/release-note/doc.md)：关联 PRD v1，保留独立版本。
-- `checkout/pages/`：页面、JSX 和标注。
-- `checkout/docs/prd/versions/1/`：初始冻结版本及截图。
-- `checkout/docs/prd/.build/`：截图清单和基线，供后续构建复用。
+- `checkout/canvases/main/`：画布（页面、JSX 和标注）。
+- `checkout/docs/prd/versions/1.json`：PRD 第 1 版的版本清单，文件本体在 `checkout/objects/`（按内容哈希存）。
+- `checkout/docs/prd/captures.json`：截图清单，给产品研发流程 skill 的截图脚本用。
 
 `lib/` 和预览 HTML 在运行时根据已安装依赖生成，不纳入版本控制。

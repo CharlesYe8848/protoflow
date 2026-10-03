@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseElementRefs, validateRefs, unusedRefKeys } from "../core/annotations.js";
+import { parseElementRefs, validateRefs, unusedRefKeys } from "../products/canvas/annotations.js";
 
 test("parseElementRefs：抽出 md 里全部 [名](#el/id) 的 id，去重保序；无引用返回空", () => {
   assert.deepEqual(parseElementRefs("点 [卡片](#el/card) 打开 [面板](#el/panel)，再点 [卡片](#el/card) 收起"), ["card", "panel"]);

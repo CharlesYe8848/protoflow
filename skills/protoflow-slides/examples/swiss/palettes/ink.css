@@ -1,0 +1,4 @@
+/* 主题：墨黑 */
+:root{--accent:#111111;--accent-ink:#ffffff;--accent-tint:#ececec}
+/* 墨黑主题：强调色页和深色页区分不开，强调色页改成浅灰底；章节页用深色 */
+section.is-accent{background:#ececec;color:var(--ink);--accent-ink:#111111;--ink:#111111;--ink-2:#2b2b2b;--muted:#555;--line:rgba(0,0,0,.15);--chart-soft:rgba(0,0,0,.2)}

@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "n": 1,
+  "meta": {
+    "schemaVersion": 1,
+    "docHash": "4a850366aead2363",
+    "mdHash": "cc5535b6893d611b",
+    "builtAt": "2026-09-15T00:00:00.006Z",
+    "sourceFingerprints": {
+      "ab_1789430400001": "c69e8e0e664ac2d6",
+      "ab_1789430400003": "5ad101dec91790c3"
+    }
+  },
+  "files": {
+    "assets/cart.png": {
+      "hash": "d91217f3032d4eb1ed47b504e42861354bc74c145622baddcff9c2cc6b8f08d4",
+      "size": 101213
+    },
+    "assets/payment.png": {
+      "hash": "f607f79235ca713c16c86fe03b2da95d2a6b414523f46fe20e78f7b936dc6159",
+      "size": 114967
+    },
+    "doc.md": {
+      "hash": "cc5535b6893d611b63b7b3de097e262821abf3b2fd53c15122b748e040118e2e",
+      "size": 1139
+    }
+  }
+}
