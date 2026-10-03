@@ -1,0 +1,9 @@
+<section data-layout="timeline">
+  <h2>四个季度，完成三次跨越</h2>
+  <ol class="timeline">
+    <li class="is-now"><strong>Q1</strong><span>夯实底座</span><p>产品与经营标准化</p></li>
+    <li><strong>Q2</strong><span>区域复制</span><p>跑通两类区域样板</p></li>
+    <li><strong>Q3</strong><span>渠道放大</span><p>伙伴收入占比到 30%</p></li>
+    <li><strong>Q4</strong><span>海外验证</span><p>完成首个海外标杆</p></li>
+  </ol>
+</section>

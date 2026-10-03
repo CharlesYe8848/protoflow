@@ -20,7 +20,7 @@ cd protoflow
 npm ci
 ```
 
-想先看效果？运行 `npm run demo`，打开终端输出的原型、PRD 和上线公告链接，无需连接 AI。
+想先看效果？运行 `npm run demo`，打开终端输出的原型、PRD、上线公告或年终汇报幻灯片链接，无需连接 AI。
 
 ### 安装技能
 
@@ -93,6 +93,8 @@ protoflow --help          # 每个工具一行；protoflow help <工具> 看参�
 
 > 先用流程图梳理新用户激活路径，再把关键结论和数据表做成一份评审幻灯片，导出 PDF。
 
+也可以直接体验[十页年终汇报示例](examples/annual-review/README.md)，查看从年度结论、经营数据到下一年规划的完整叙事。
+
 ## 为什么用 ProtoFlow
 
 **原型改了以后，知道哪些标注、文档和已发布内容需要跟着改。**
@@ -133,8 +135,8 @@ ProtoFlow 把原型、元素标注、截图和文档关联起来，让一次交�
 
 ## 更多
 
-- [完整示例](examples/README.md)：体验原型、标注、PRD、上线公告和改动检查。
+- [完整示例](examples/README.md)：体验原型、标注、PRD、上线公告、年终汇报幻灯片和改动检查。
 - [使用说明与常见问题](docs/usage.md)：项目保存、截图、系统支持和平台发布。
 - [问题反馈](https://github.com/CharlesYe8848/protoflow/issues) · [安全说明](SECURITY.md)
 
-[MIT](LICENSE) · v0.2.0 预览版
+[MIT](LICENSE) · v0.2.1 预览版

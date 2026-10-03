@@ -1,0 +1,15 @@
+/* 黑白极简风（mono）的皮肤：黑白灰打底、一个强调色做焦点；粗体标题、圆角浅灰面板；
+   装饰只有三处——封面右上角、结束页右下角的强调色方块，引言的大引号。版式骨架在 layouts.css，配色在 theme.css。 */
+:root{
+  --ink:#0f172a; --ink-2:#334155; --muted:#64748b; --faint:#94a3b8; --line:#e2e8f0; --tint:#f1f5f9; --paper:#ffffff; --dark:#0f172a;
+  --chart-soft:#cbd5e1;
+  --font:"PingFang SC","Microsoft YaHei","Helvetica Neue",Arial,sans-serif; --font-display:var(--font);
+  --w-display:800; --w-title:800; --w-h3:700; --w-strong:800;
+  --r-lg:28px; --r-md:24px; --r-sm:16px; --bullet-radius:0;
+  --panel-bg:var(--tint); --panel-border:0 solid transparent;
+  --chart-radius:6; --chart-weight:700;
+}
+section[data-layout="cover"]::before{content:"";position:absolute;right:0;top:0;width:560px;height:560px;background:var(--accent)}
+section[data-layout="end"]::after{content:"";position:absolute;right:0;bottom:0;width:360px;height:360px;background:var(--accent)}
+section[data-layout="quote"]::before{content:"“";position:absolute;left:var(--pad-x);top:40px;font-size:480px;line-height:1;font-weight:800;color:var(--accent);font-family:Georgia,serif}
+section[data-layout="quote"] blockquote{margin-top:120px}

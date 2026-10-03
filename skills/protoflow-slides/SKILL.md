@@ -23,7 +23,7 @@ metadata:
 | 定设计方向、检查效果时 | `references/principles.md`：不管什么风格都成立的设计原则 |
 | 想用现成的图标、图表、数字滚动、进场动效 | `references/kit.md`：可选工具库 `lib/pf-kit.*`，拷进 `design/` 就能用 |
 | 有视频、背景音乐、旁白，或者要当视频放 | `references/media.md`：声音的目标（响度、比例、长度）和 `scripts/media.mjs`（准备素材、体检） |
-| 汇报、评审这类场合想要现成的样子 | `examples/`：`mono` 黑白极简、`swiss` 瑞士风两个样例，整套拷进 `design/` 用、抄一部分、或只看思路都行 |
+| 汇报、评审这类场合想要现成的样子 | `examples/`：`mono` 黑白极简、`swiss` 瑞士风两个视觉样例，整套拷进 `design/` 用、抄一部分、或只看思路都行；仓库 `examples/annual-review/` 另有十页年终汇报完整场景示例 |
 
 ## 做法
 

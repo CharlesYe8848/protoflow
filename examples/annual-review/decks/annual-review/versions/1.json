@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "n": 1,
+  "meta": {
+    "deckHash": "2390279ec3b29ea7",
+    "builtAt": "2026-10-03T04:33:12.954Z",
+    "sources": []
+  },
+  "files": {
+    "design/layouts.css": {
+      "hash": "c2a77cd7d6dbca85d09860ab071482bc1e690b9b1740ae9067857497cc4fb23b",
+      "size": 24759
+    },
+    "design/layouts.js": {
+      "hash": "b78025cb54051048d580be8809e076b0e53fa261fd235b84a9b65587b8a67897",
+      "size": 383
+    },
+    "design/mono.css": {
+      "hash": "b9b3287d09eed15578a57457aaea1d4e706e132cd22df089a25623302fcaa51f",
+      "size": 1286
+    },
+    "design/pf-kit.css": {
+      "hash": "ecbf35a46831e9360df2485f49db32167b78606b23a5b962612ab57daee52c23",
+      "size": 6632
+    },
+    "design/pf-kit.js": {
+      "hash": "fdc87205da451c7413e9d5c5b280a2bef3892e578949e033429c29fb9a7fb480",
+      "size": 45471
+    },
+    "design/theme.css": {
+      "hash": "d7d6280e37445614e7924ff69d8980929a007da0e6056f15f403c6460720744a",
+      "size": 86
+    },
+    "playback.json": {
+      "hash": "2f964a122546327f8be4f9dc3bfac1633c96448b2211e559adbb5d5f348d68f8",
+      "size": 136
+    },
+    "slides/01-封面.html": {
+      "hash": "d29693273bc13790a017fe381cf85b29f1d62815878d91fdd14d058d313182ac",
+      "size": 301
+    },
+    "slides/02-年度结论.html": {
+      "hash": "35e93ccae79b7eda112cf3d484c17bfd9967f4e95fc22f9e32c5c55d09050128",
+      "size": 160
+    },
+    "slides/03-核心成绩.html": {
+      "hash": "a1f7923e93a563a7c1c1c6f8c3808b9444e851872553b03d2e20100d7546e07b",
+      "size": 545
+    },
+    "slides/04-增长曲线.html": {
+      "hash": "ed66947acf7a6652534ee387f3e57e939b234b77f8375611d1626f2bd1a19736",
+      "size": 398
+    },
+    "slides/05-增长引擎.html": {
+      "hash": "37c5490154773a6295c724fc36b24985eb2ed1f1e2959560c966f624026aa7e6",
+      "size": 605
+    },
+    "slides/06-经验与不足.html": {
+      "hash": "161919cb64290e16aeb0c533e612ef5bde5199ee9d3159d12668b9d06995e4d6",
+      "size": 494
+    },
+    "slides/07-明年重点.html": {
+      "hash": "9a97954f6e2c4e130ec942406597fc2608e4a08a09e1fc5902b4333ee92abaa3",
+      "size": 492
+    },
+    "slides/08-行动节奏.html": {
+      "hash": "350a39927ccda3e2e981093a072f389379127f5bcf031f5a2535eb2e8beae476",
+      "size": 493
+    },
+    "slides/09-年度目标.html": {
+      "hash": "0febaaa8d39c8e8134881e79444fa30de9bf82a636c1ec3be609fc89bd5ef18a",
+      "size": 383
+    },
+    "slides/10-结束.html": {
+      "hash": "9caec187b3d85abb2ba3828b98af5047b97f8da5b8f3acf595c1a541755c4d8f",
+      "size": 113
+    }
+  }
+}

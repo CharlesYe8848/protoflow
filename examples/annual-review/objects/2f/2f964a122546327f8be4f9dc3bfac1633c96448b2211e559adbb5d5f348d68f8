@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "autoAdvance": {
+    "enabled": false,
+    "defaultDurationMs": 8000,
+    "loop": false
+  },
+  "slides": {}
+}

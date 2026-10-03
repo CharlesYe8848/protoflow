@@ -4,6 +4,7 @@
 //   error（必须改）：
 //     OVERFLOW        内容超出 1920×1080 画布（会被裁掉）
 //     TEXT_CLIPPED    文字在自己的框里放不下（框设了 overflow 隐藏）
+//     METRIC_WRAP     指标或大数字发生换行（单位应移到说明里，或缩短数字）
 //     ASSET_FAILED    本地资源没加载出来（图片、字体、视频……）
 //     SCRIPT_ERROR    脚本报错（没接住的异常、console.error；可选库写错图标名、图表类型也走这里）
 //     EXTERNAL        依赖外部地址（导出的单 HTML 离线打不开）
@@ -83,6 +84,15 @@ function inspectSlide({ index }) {
     if (!/(hidden|clip)/.test(cs.overflow + cs.overflowY + cs.overflowX) || el === sec) continue;
     if (!(el.innerText || "").trim()) continue;
     if (el.scrollHeight - el.clientHeight > 2 || el.scrollWidth - el.clientWidth > 2) add("TEXT_CLIPPED", "error", `${describe(el)} 里的内容放不下，被裁掉了`);
+  }
+  // 指标 / 大数字必须一行展示。它们即使没超出画布，内部换行也会破坏视觉层级；Range 的总高度明显超过
+  // 一行 line-height 就说明已经折成两行。单位放到下面的说明里，不跟数字挤在一起。
+  for (const el of sec.querySelectorAll('[data-layout="metrics"] .metric strong, [data-layout="big-number"] .number')) {
+    if (!visible(el)) continue;
+    const cs = getComputedStyle(el);
+    const line = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.2;
+    const height = el.getBoundingClientRect().height / k;
+    if (height > line * 1.35) add("METRIC_WRAP", "error", `${describe(el)} 换成了多行；缩短数字，单位移到下面的说明里`);
   }
   // 互相压住：叶子级内容块两两比较，不是包含关系、重叠面积超过较小者的 8%。铺满大半画布（≥ 80%）的图是背景，不算。
   const isBackground = (el) => {

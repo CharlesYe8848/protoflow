@@ -153,6 +153,20 @@ test("样例和可选库：样例里的 pf-kit 跟 lib/ 一致；mono、swiss �
   } finally { host.cleanup(); }
 });
 
+test("完整示例：年终汇报有十页、通过页面约定并保留可打开的 v1", () => {
+  const root = path.join(ROOT, "examples", "annual-review");
+  const project = JSON.parse(fs.readFileSync(path.join(root, "project.json"), "utf8"));
+  const deck = JSON.parse(fs.readFileSync(path.join(root, "decks", "annual-review", "deck.json"), "utf8"));
+  const slides = fs.readdirSync(path.join(root, "decks", "annual-review", "slides")).filter((f) => f.endsWith(".html")).sort();
+  assert.equal(project.id, "annual-review");
+  assert.equal(deck.head, 1);
+  assert.equal(slides.length, 10);
+  for (const file of slides) assert.deepEqual(checkSlide(fs.readFileSync(path.join(root, "decks", "annual-review", "slides", file), "utf8")), [], file);
+  const version = JSON.parse(fs.readFileSync(path.join(root, "decks", "annual-review", "versions", "1.json"), "utf8"));
+  assert.equal(Object.keys(version.files).filter((f) => f.startsWith("slides/")).length, 10);
+  for (const { hash } of Object.values(version.files)) assert.ok(fs.existsSync(path.join(root, "objects", hash.slice(0, 2), hash)), hash);
+});
+
 test("截图的出处：assets 里图片旁边的 .source.json 定版时记进引用", async () => {
   const host = createTestHost(PRODUCTS);
   try {
@@ -783,7 +797,7 @@ test("媒体脚本（media.mjs）：prepare 转成 H.264 + AAC、响度拉到 -1
   } finally { fs.rmSync(tmp, { recursive: true, force: true }); host.cleanup(); }
 });
 
-test("检查（protoflow-slides/scripts/check.mjs）：真渲染；error 是超出画布、资源加载失败、脚本报错、外部地址；重叠、小字、页里样式改到别处是 warn；正常的页没问题", async () => {
+test("检查（protoflow-slides/scripts/check.mjs）：真渲染；error 是超出画布、指标换行、资源加载失败、脚本报错、外部地址；重叠、小字、页里样式改到别处是 warn；正常的页没问题", async () => {
   const host = createTestHost(PRODUCTS);
   try {
     const { id, write } = await setup(host);
@@ -796,6 +810,7 @@ test("检查（protoflow-slides/scripts/check.mjs）：真渲染；error 是超�
     write("09-外链.html", '<section><h2>外链</h2><img src="https://example.com/a.png" alt=""></section>');
     write("10-漏样式.html", '<section class="p10"><style>h2{letter-spacing:.1em} .p10 p{color:var(--accent)}</style><h2>全局样式</h2><p>只改本页的没事</p></section>');
     write("11-自由.html", '<section class="p11"><style>.p11{background:#fdf6ec}.p11 h2{font-size:120px;color:#e8693c}</style><h2>自由写的一页</h2></section>');
+    write("12-指标换行.html", '<section class="p12" data-layout="metrics"><style>.p12 .metric strong{white-space:normal}</style><h2>目标</h2><div class="metrics"><div class="metric"><strong>7,000<br><small>万</small></strong><span>年度收入</span></div></div></section>');
     const shots = fs.mkdtempSync(path.join(os.tmpdir(), "pf-deck-shots-"));
     const r = spawnSync(process.execPath, [path.join(SLIDES_SKILL, "scripts", "check.mjs"), "--projectId", id, "--deckId", "pitch", "--dir", host.ws, "--shots", shots],
       { encoding: "utf8", env: { ...process.env, PROTOFLOW_CLI: path.join(ROOT, "bin", "protoflow-cli.js") }, timeout: 120000 });
@@ -810,8 +825,9 @@ test("检查（protoflow-slides/scripts/check.mjs）：真渲染；error 是超�
     assert.ok(out.slides.find((s) => s.id === "07-报错").issues.some((x) => x.code === "SCRIPT_ERROR" && x.message.includes("第七页坏了")), "翻到这页才出的错算这一页的");
     assert.ok(out.deckIssues.some((x) => x.code === "SCRIPT_ERROR" && x.message.includes("no-such-icon")), "可选库写错图标名：加载时报的算整份稿子的");
     assert.ok(codes["09-外链"].includes("error:EXTERNAL"), dump);
+    assert.ok(codes["12-指标换行"].includes("error:METRIC_WRAP"), dump);
     const leak = out.slides.find((s) => s.id === "10-漏样式").issues.find((x) => x.code === "STYLE_LEAK");
     assert.ok(leak && leak.level === "warn" && leak.message.includes("`h2`") && !leak.message.includes(".p10 p"), dump);
-    assert.equal(fs.readdirSync(shots).filter((f) => f.endsWith(".png")).length, 11, "每页一张截图");
+    assert.equal(fs.readdirSync(shots).filter((f) => f.endsWith(".png")).length, 12, "每页一张截图");
   } finally { host.cleanup(); }
 });

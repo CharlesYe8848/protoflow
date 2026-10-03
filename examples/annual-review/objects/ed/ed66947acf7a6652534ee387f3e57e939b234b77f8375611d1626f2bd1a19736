@@ -1,0 +1,8 @@
+<section data-layout="chart">
+  <div class="text">
+    <div class="kicker">季度收入</div>
+    <h2>增长在下半年明显加速</h2>
+    <p>行业方案标准化后，交付周期缩短 35%，第四季度收入同比增长 46%。</p>
+  </div>
+  <div class="chart" data-chart="bar" data-labels="Q1,Q2,Q3,Q4" data-values="860,1040,1280,1540" data-unit="万" data-highlight="3"></div>
+</section>

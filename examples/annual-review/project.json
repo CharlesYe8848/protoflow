@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "formatVersion": 3,
+  "id": "annual-review",
+  "name": "annual-review",
+  "products": {
+    "deck": {
+      "rootSeg": "decks",
+      "metaFile": "deck.json",
+      "formatVersion": 1
+    }
+  }
+}

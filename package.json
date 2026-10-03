@@ -1,6 +1,6 @@
 {
   "name": "protoflow",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "面向 AI 助手的原型、文档、表格、绘图与幻灯片工作流（CLI）",
   "type": "module",
   "license": "MIT",

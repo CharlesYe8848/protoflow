@@ -143,8 +143,9 @@ section[data-layout="image-grid"] figcaption{font-size:var(--t-small);font-weigh
 /* ---- 数据指标：2–4 个，可带进度条 ---- */
 section[data-layout="metrics"] .metrics{flex:1;display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:72px;align-content:center}
 section[data-layout="metrics"] .metric{display:flex;flex-direction:column;gap:20px}
-section[data-layout="metrics"] .metric strong{font-family:var(--font-display);font-size:160px;line-height:1;font-weight:var(--w-display);letter-spacing:-.03em}
+section[data-layout="metrics"] .metric strong{font-family:var(--font-display);font-size:160px;line-height:1;font-weight:var(--w-display);letter-spacing:-.03em;white-space:nowrap}
 section[data-layout="metrics"] .metric.is-key strong{color:var(--accent)}
+section.is-accent[data-layout="metrics"] .metric.is-key strong{color:var(--accent-ink)}
 section[data-layout="metrics"] .metric span{font-size:var(--t-small);color:var(--muted)}
 section[data-layout="metrics"] .metric .chart{height:24px;min-height:0;margin-top:8px}
 
