@@ -53,7 +53,7 @@ done
 
 ### 安装命令行工具
 
-助手通过 `protoflow` 命令操作 ProtoFlow（不需要配置 MCP）。在本仓库根目录执行一次：
+助手只通过 `protoflow` CLI 操作 ProtoFlow；当前不再提供 MCP 入口。在本仓库根目录执行一次：
 
 ```bash
 npm link                  # 装一个全局的 protoflow 命令，指向这个仓库（仓库更新后命令跟着更新）

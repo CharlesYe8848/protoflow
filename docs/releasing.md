@@ -43,7 +43,7 @@ git remote add origin https://github.com/CharlesYe8848/protoflow.git
 git push -u origin main
 ```
 
-4. 等待 Actions 验证成功。开启私密漏洞报告，补仓库简介和主题（mcp、prototype、prd、ai）。
+4. 等待 Actions 验证成功。开启私密漏洞报告，补仓库简介和主题（cli、prototyping、prd、ai 等）。
 5. 创建 `v0.1.0` tag 和标记为 **Pre-release** 的 GitHub Release，正文使用 [首版说明](release-v0.1.0.md)。Release 中相对文档链接需换成公开仓库链接。
 
 后续公开开发以新仓库为准；不要合并原开发仓库历史，也不要把重复快照覆盖到已经有协作改动的目录。
