@@ -41,7 +41,7 @@ test('Mermaid on an inactive canvas page renders and survives page switches with
       }`,
     }));
     fs.writeFileSync(path.join(dir, 'canvas.html'), buildCanvasHtml({ projectName: 'Regression', pages, docs: [] }));
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const page = await browser.newPage();
     await page.goto(pathToFileURL(path.join(dir, 'canvas.html')).href);
     const frame = page.frames().find(f => f.url().endsWith('/preview.html'));
@@ -81,7 +81,7 @@ test('switching to a page with a saved viewport refreshes iframe height without 
       pages: [{ id: 'pg_home', name: 'Home', artboards: [] }, { id: 'pg_mobile', name: 'Mobile', artboards: [{ id: 'ab_mobile', name: 'Mobile', hasSource: true, canvasWidth: 375 }] }],
       exportBundle: { canvasState: { activePage: 'pg_home', pages: { pg_mobile: { scale: 0.7, x: 80, y: 40 } } } },
     }));
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const page = await browser.newPage();
     await page.goto(pathToFileURL(path.join(dir, 'canvas.html')).href);
     const frame = page.frames().find(f => f.url().endsWith('/preview.html'));
@@ -123,7 +123,7 @@ test('saved viewport keeps each artboard concealed until React mounts and its co
       pages: [{ id: 'pg_mobile', name: 'Mobile', artboards: [{ id: 'ab_mobile', name: 'Mobile', hasSource: true, canvasWidth: 375 }] }],
       exportBundle: { canvasState: { pages: { pg_mobile: { scale: 0.7, x: 80, y: 40 } } } },
     }));
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const page = await browser.newPage();
     await page.goto(pathToFileURL(path.join(dir, 'canvas.html')).href);
     const frame = page.frames().find(f => f.url().endsWith('/preview.html'));

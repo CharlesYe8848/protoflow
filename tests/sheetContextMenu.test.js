@@ -46,7 +46,7 @@ test("表格选区右键标注：真实浏览器里保留/切换选区、复制 
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   let browser;
   try {
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const page = await browser.newPage();
     await page.setViewport({ width: 1100, height: 700 });
     await page.goto(`http://127.0.0.1:${server.address().port}/p/demo/sheets/sales/preview.html`);

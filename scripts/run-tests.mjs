@@ -30,6 +30,6 @@ try {
   const r = spawnSync(process.execPath, args, { cwd: root, stdio: "inherit", env: { ...process.env, TMPDIR: runTmp, ...isolatedEnv(runTmp) } });
   status = r.status ?? 1;
 } finally {
-  fs.rmSync(runTmp, { recursive: true, force: true });
+  fs.rmSync(runTmp, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
 }
 process.exit(status);

@@ -34,7 +34,7 @@ async function withPage(fn) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   let browser;
   try {
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const p = await browser.newPage();
     await p.setViewport({ width: 1200, height: 760 });
     const errors = [];
@@ -163,7 +163,7 @@ async function withPages(pages, fn) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   let browser;
   try {
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const p = await browser.newPage();
     await p.setViewport({ width: 1200, height: 760 });
     await p.goto(`http://127.0.0.1:${server.address().port}/p/demo/diagrams/d/preview.html`);

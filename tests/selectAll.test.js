@@ -35,7 +35,7 @@ async function serve(routes, fn) {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   let browser;
   try {
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const p = await browser.newPage();
     await p.setViewport({ width: 1200, height: 760 });
     await fn(p, `http://127.0.0.1:${server.address().port}`);
@@ -115,7 +115,7 @@ test("⌘A · 画布：当前页的画板放进元素引用，不选界面文字
       res.end(fs.readFileSync(file));
     });
     await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
-    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true });
+    browser = await launch({ executablePath: (await resolveBrowserExecutable()).path, headless: true, args: ["--no-sandbox", "--disable-setuid-sandbox"] });
     const p = await browser.newPage();
     await p.setViewport({ width: 1280, height: 800 });
     await p.goto(`http://127.0.0.1:${server.address().port}/canvas.html`);

@@ -567,7 +567,7 @@ test("缩放：默认自适应窗口；＋/− 以舞台中心为锚点，超出
     const refit = await state();
     assert.equal(refit.label, fitted.label, "回到自适应窗口");
     await page.setViewport({ width: 1200, height: 800 });
-    await new Promise((r) => setTimeout(r, 50));
+    await page.waitForFunction((previousWidth) => document.querySelector(".pf-slide.active").getBoundingClientRect().width > previousWidth, {}, refit.width);
     assert.ok((await state()).width > refit.width, "自适应模式跟着窗口变大");
     assert.deepEqual(errors, []);
   } finally {
