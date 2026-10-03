@@ -1,8 +1,9 @@
 <h1><img src="docs/images/protoflow-icon.svg" alt="" width="40" height="40" align="absmiddle"> ProtoFlow</h1>
 
-**描述需求，画出原型，整理数据，交付文档与演示。**
+**描述需求，梳理思路，画出原型，整理数据，交付文档与演示。**
 
-配合 Claude Code、Cursor、Codex 等 AI 助手，用对话制作可交互原型、添加元素标注、生成需求文档、结构化表格和幻灯片。内容改了，还能检查哪些引用和交付物需要更新。
+配合 Claude Code、Cursor、Codex 等 AI 助手，用对话制作脑图与流程图、可交互原型、元素标注、PRD、
+可导出 Excel 的结构化表格和幻灯片。内容改了，还能检查哪些引用和交付物需要更新。
 
 ![ProtoFlow：购物车原型与元素标注](docs/images/checkout-canvas.png)
 
